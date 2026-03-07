@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Lead, TourPackage, User } from '@/types';
 import * as api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/Toast';
 
 interface AppState {
@@ -33,7 +34,7 @@ interface AppState {
 // Mock Data removed
 
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
     user: null,
     leads: [],
     tours: [],
@@ -71,18 +72,54 @@ export const useAppStore = create<AppState>((set) => ({
     },
     updateLead: async (id, updates) => {
         try {
+            // If assigning a staff member, first ensure they have a profile entry
+            // (required by the leads.assigned_staff_id FK constraint on profiles table)
+            if (updates.assigned_staff_id) {
+                const staffMember = get().staff.find(s => s.id === updates.assigned_staff_id);
+                if (staffMember) {
+                    // Best-effort upsert into profiles so FK doesn't fail
+                    try {
+                        await supabase.from('profiles').upsert([{
+                            id: staffMember.id,
+                            full_name: staffMember.full_name,
+                            email: staffMember.email,
+                            role: staffMember.role,
+                        }], { onConflict: 'id' });
+                    } catch (_) {
+                        // RLS may block this — we'll fall through and see if update works anyway
+                    }
+                }
+            }
+
             // Optimistic update
             set((state) => ({
                 leads: state.leads.map((l) => (l.id === id ? { ...l, ...updates } : l))
             }));
-            await api.updateLead(id, updates);
-            toast.success('Lead updated successfully');
+
+            try {
+                await api.updateLead(id, updates);
+                toast.success('Lead updated successfully');
+            } catch (error: any) {
+                // If FK constraint error on assigned_staff_id, save without it and notify user
+                const isFkError = error?.code === '23503' ||
+                    (error?.message && error.message.includes('foreign key'));
+                if (isFkError && updates.assigned_staff_id) {
+                    const { assigned_staff_id: _removed, ...updatesWithoutStaff } = updates;
+                    await api.updateLead(id, updatesWithoutStaff);
+                    toast.success('Lead updated (staff assignment skipped — staff not yet synced to authentication)');
+                    get().fetchLeads();
+                } else {
+                    throw error;
+                }
+            }
         } catch (error) {
             console.error('Failed to update lead:', error);
-            toast.error('Failed to update lead');
-            // Revert on failure (could implement fetchLeads() here to sync)
+            toast.error(`Failed to update lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Revert on failure
+            get().fetchLeads();
         }
     },
+
     deleteLead: async (id) => {
         try {
             // Optimistic update
@@ -94,6 +131,7 @@ export const useAppStore = create<AppState>((set) => ({
         } catch (error) {
             console.error('Failed to delete lead:', error);
             toast.error('Failed to delete lead');
+            get().fetchLeads();
         }
     },
 
@@ -133,6 +171,7 @@ export const useAppStore = create<AppState>((set) => ({
             await api.updateTour(id, updates);
         } catch (error) {
             console.error('Failed to update tour:', error);
+            get().fetchTours();
         }
     },
     deleteTour: async (id) => {
@@ -143,6 +182,7 @@ export const useAppStore = create<AppState>((set) => ({
             await api.deleteTour(id);
         } catch (error) {
             console.error('Failed to delete tour:', error);
+            get().fetchTours();
         }
     },
 
@@ -170,7 +210,7 @@ export const useAppStore = create<AppState>((set) => ({
             toast.success('Staff member added successfully');
         } catch (error) {
             console.error('Failed to add staff:', error);
-            toast.error('Failed to add staff member');
+            toast.error(error instanceof Error ? error.message : 'Failed to add staff member');
             set({ isLoading: false });
         }
     },
@@ -184,6 +224,7 @@ export const useAppStore = create<AppState>((set) => ({
         } catch (error) {
             console.error('Failed to update staff:', error);
             toast.error('Failed to update staff');
+            get().fetchStaff();
         }
     },
     deleteStaff: async (id) => {
@@ -196,6 +237,7 @@ export const useAppStore = create<AppState>((set) => ({
         } catch (error) {
             console.error('Failed to delete staff:', error);
             toast.error('Failed to delete staff');
+            get().fetchStaff();
         }
     },
 }));

@@ -17,11 +17,13 @@ import {
 } from "@/components/ui/dialog";
 import { LeadForm } from '@/components/leads/LeadForm';
 import { v4 as uuidv4 } from 'uuid';
+import { useI18n } from '@/i18n';
 
 export function Dashboard() {
     const { leads, tours, addLead } = useAppStore();
     const navigate = useNavigate();
     const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+    const { t, language, setLanguage } = useI18n();
 
     const handleSaveLead = (data: any) => {
         addLead({
@@ -54,14 +56,14 @@ export function Dashboard() {
         ).length;
 
         const kpis = [
-            { label: 'Total Leads', value: totalLeads.toString(), icon: 'Users' },
-            { label: 'Active Tours', value: activeTours.toString(), icon: 'Map' },
-            { label: 'Conversion Rate', value: `${conversionRate}%`, icon: 'TrendingUp' },
-            { label: 'Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign' },
-            { label: 'Pending Follow-ups', value: pendingFollowUps.toString(), icon: 'Calendar' },
-            { label: 'Won Leads', value: convertedLeads.toString(), icon: 'UserCheck' }, // Replaced "Messages Sent"
-            { label: 'Avg. Budget', value: convertedLeads > 0 ? `$${Math.round(totalRevenue / convertedLeads).toLocaleString()}` : '$0', icon: 'DollarSign' },
-            { label: 'Lost Leads', value: leads.filter(l => l.status === 'lost').length.toString(), icon: 'Users' },
+            { label: t('totalLeads'), value: totalLeads.toString(), icon: 'Users' },
+            { label: t('activeTours'), value: activeTours.toString(), icon: 'Map' },
+            { label: t('conversionRate'), value: `${conversionRate}%`, icon: 'TrendingUp' },
+            { label: t('revenue'), value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign' },
+            { label: t('pendingFollowUps'), value: pendingFollowUps.toString(), icon: 'Calendar' },
+            { label: t('wonLeads'), value: convertedLeads.toString(), icon: 'UserCheck' },
+            { label: t('avgBudget'), value: convertedLeads > 0 ? `$${Math.round(totalRevenue / convertedLeads).toLocaleString()}` : '$0', icon: 'DollarSign' },
+            { label: t('lostLeads'), value: leads.filter(l => l.status === 'lost').length.toString(), icon: 'Users' },
         ];
 
         // 2. Leads Trend Data (Last 30 Days)
@@ -97,17 +99,17 @@ export function Dashboard() {
         const recentActivity = [
             ...leads.map(l => ({
                 id: `lead-${l.id}`,
-                user: 'System', // or derived if we tracked who created it
-                action: 'New Lead Created',
+                user: t('system'),
+                action: t('newLeadCreated'),
                 target: l.name,
                 time: l.created_at,
                 avatar: ''
             })),
-            ...tours.map(t => ({
-                id: `tour-${t.id}`,
-                user: 'System',
-                action: 'New Tour Added',
-                target: t.title,
+            ...tours.map(tour => ({
+                id: `tour-${tour.id}`,
+                user: t('system'),
+                action: t('newTourAdded'),
+                target: tour.title,
                 time: new Date().toISOString(), // Tours don't have created_at in interface yet, fallback
                 avatar: ''
             }))
@@ -119,34 +121,44 @@ export function Dashboard() {
             }));
 
         return { kpis, leadsTrendData, revenueData, recentActivity };
-    }, [leads, tours]);
+    }, [leads, tours, t]);
 
     return (
         <div className="flex flex-col min-h-full gap-4">
             <div className="flex-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Dashboard</h2>
-                    <p className="text-slate-500 font-medium mt-1">Overview of your agency's performance.</p>
+                    <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">{t('dashboard')}</h2>
+                    <p className="text-slate-500 font-medium mt-1">{t('overview')}</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <div
+                        className="relative inline-flex h-9 w-24 items-center justify-between rounded-full bg-slate-100 p-1 cursor-pointer ring-1 ring-inset ring-slate-200 transition-colors mr-1 shrink-0 group"
+                        onClick={() => setLanguage(language === 'EN' ? 'FR' : 'EN')}
+                        title="Toggle Language"
+                    >
+                        <span className={`z-10 w-1/2 text-center text-[11px] font-bold tracking-wider select-none transition-colors duration-300 ${language === 'EN' ? 'text-slate-800' : 'text-slate-400 group-hover:text-slate-600'}`}>EN</span>
+                        <span className={`z-10 w-1/2 text-center text-[11px] font-bold tracking-wider select-none transition-colors duration-300 ${language === 'FR' ? 'text-slate-800' : 'text-slate-400 group-hover:text-slate-600'}`}>FR</span>
+                        <div className={`absolute top-1 h-7 w-[calc(50%-4px)] rounded-full bg-white shadow-sm ring-1 ring-slate-200/50 transition-all duration-300 ease-in-out ${language === 'FR' ? 'left-[calc(50%+2px)]' : 'left-1'}`} />
+                    </div>
+
                     <Button
                         className="bg-[#33A894] hover:bg-[#2c9180] text-white shadow-sm border-none"
                         onClick={() => setIsLeadModalOpen(true)}
                     >
-                        <Plus className="mr-2 h-4 w-4" /> New Lead
+                        <Plus className="mr-2 h-4 w-4" /> {t('newLead')}
                     </Button>
                     <Button
                         variant="outline"
                         className="border-slate-200 hover:bg-slate-50 shadow-sm"
                         onClick={() => navigate('/tours/new')}
                     >
-                        <Plus className="mr-2 h-4 w-4 text-emerald-600" /> New Tour
+                        <Plus className="mr-2 h-4 w-4 text-emerald-600" /> {t('newTour')}
                     </Button>
                     <Button
                         variant="outline"
                         className="border-slate-200 hover:bg-slate-50 shadow-sm"
                     >
-                        <Send className="mr-2 h-4 w-4 text-blue-600" /> Broadcast
+                        <Send className="mr-2 h-4 w-4 text-blue-600" /> {t('broadcast')}
                     </Button>
                 </div>
             </div>
@@ -167,9 +179,9 @@ export function Dashboard() {
             <Dialog open={isLeadModalOpen} onOpenChange={setIsLeadModalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Add New Lead</DialogTitle>
+                        <DialogTitle>{t('addNewLeadTitle')}</DialogTitle>
                         <DialogDescription>
-                            Add a new lead to your pipeline manually.
+                            {t('addNewLeadDesc')}
                         </DialogDescription>
                     </DialogHeader>
                     <LeadForm

@@ -6,7 +6,7 @@ import {
     Map,
     MessageSquare,
     BarChart3,
-
+    LayoutGrid,
     LogOut,
     Menu
 } from 'lucide-react';
@@ -15,18 +15,22 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/components/AuthProvider';
 
-const NAV_ITEMS = [
-    { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
-    { label: 'Leads', icon: Users, href: '/leads' },
-    { label: 'Tour Packages', icon: Map, href: '/tours' },
-    { label: 'WhatsApp', icon: MessageSquare, href: '/whatsapp' },
-    { label: 'Analytics', icon: BarChart3, href: '/analytics' },
-    { label: 'Staff', icon: Users, href: '/staff' },
-];
+import { useI18n } from '@/i18n';
 
 export function Sidebar() {
+    const { t } = useI18n();
     const { pathname } = useLocation();
     const { user, signOut } = useAuth();
+
+    const NAV_ITEMS = [
+        { label: t('dashboard'), icon: LayoutDashboard, href: '/' },
+        { label: t('pipeline'), icon: LayoutGrid, href: '/pipeline' },
+        { label: t('leads'), icon: Users, href: '/leads' },
+        { label: t('tourPackages'), icon: Map, href: '/tours' },
+        { label: t('whatsapp'), icon: MessageSquare, href: '/whatsapp' },
+        { label: t('analytics'), icon: BarChart3, href: '/analytics' },
+        { label: t('staff'), icon: Users, href: '/staff' },
+    ];
 
     const NavContent = () => (
         <div className="flex flex-col h-full bg-white border-r border-slate-200">
@@ -76,7 +80,7 @@ export function Sidebar() {
                     }}
                 >
                     <LogOut className="h-4 w-4" />
-                    Sign Out
+                    {t('signout')}
                 </Button>
             </div>
         </div>

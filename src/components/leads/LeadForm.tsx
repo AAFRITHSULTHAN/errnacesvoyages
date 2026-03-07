@@ -32,6 +32,7 @@ const leadSchema = z.object({
     source: z.string().min(2, 'Source is required'),
     tour_interest: z.string().optional(),
     budget: z.number().optional(),
+    assigned_staff_id: z.string().optional(),
     notes: z.string().optional(),
 });
 
@@ -44,7 +45,14 @@ interface LeadFormProps {
 }
 
 export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
-    const { tours } = useAppStore();
+    const { tours, staff, fetchStaff } = useAppStore();
+
+    useEffect(() => {
+        if (staff.length === 0) {
+            fetchStaff();
+        }
+    }, [staff.length, fetchStaff]);
+
     const form = useForm<LeadFormValues>({
         resolver: zodResolver(leadSchema) as any,
         defaultValues: initialData ? {
@@ -55,6 +63,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             source: initialData.source,
             tour_interest: initialData.tour_interest || '',
             budget: initialData.budget,
+            assigned_staff_id: initialData.assigned_staff_id || '',
             notes: initialData.notes || '',
         } : {
             name: '',
@@ -64,6 +73,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             source: 'Website',
             tour_interest: '',
             budget: undefined,
+            assigned_staff_id: '',
             notes: '',
         },
     });
@@ -83,7 +93,11 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
     }, [tourInterest, tours, form]);
 
     const handleSubmit = (values: LeadFormValues) => {
-        onSubmit(values);
+        const payload = { ...values };
+        if (payload.assigned_staff_id === 'unassigned') {
+            payload.assigned_staff_id = undefined;
+        }
+        onSubmit(payload);
     };
 
     return (
@@ -187,31 +201,58 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
                     />
                 </div>
 
-                <FormField<LeadFormValues>
-                    control={form.control}
-                    name="tour_interest"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Interested Tour</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value as string}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a tour (optional)" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="custom">Custom / Other</SelectItem>
-                                    {tours.map((tour) => (
-                                        <SelectItem key={tour.id} value={tour.title}>
-                                            {tour.title}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField<LeadFormValues>
+                        control={form.control}
+                        name="tour_interest"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Interested Tour</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value as string}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a tour (optional)" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="custom">Custom / Other</SelectItem>
+                                        {tours.map((tour) => (
+                                            <SelectItem key={tour.id} value={tour.title}>
+                                                {tour.title}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField<LeadFormValues>
+                        control={form.control}
+                        name="assigned_staff_id"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Assign Staff</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value as string}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select staff (optional)" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                                        {staff.map((member) => (
+                                            <SelectItem key={member.id} value={member.id}>
+                                                {member.full_name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
 
                 <FormField<LeadFormValues>
                     control={form.control}

@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Mail, MoreHorizontal, Phone } from 'lucide-react';
+import { Search, Plus, Mail, MoreHorizontal, Phone, TrendingUp, Users } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import { cn } from '@/lib/utils';
 import {
     Table,
@@ -34,18 +35,39 @@ import { StaffProfile } from '@/components/staff/StaffProfile';
 import { useAppStore } from '@/store';
 import { v4 as uuidv4 } from 'uuid';
 import type { User } from '@/types';
+import { useI18n } from '@/i18n';
 
 
 export function Staff() {
-    const { staff, addStaff, updateStaff, deleteStaff, fetchStaff } = useAppStore();
+    const { staff, addStaff, updateStaff, deleteStaff, fetchStaff, leads, fetchLeads } = useAppStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<User | undefined>(undefined);
+    const { t } = useI18n();
 
     useEffect(() => {
         fetchStaff();
-    }, [fetchStaff]);
+        fetchLeads();
+    }, [fetchStaff, fetchLeads]);
+
+    // Calculate staff sales data — includes ALL assigned leads, not just converted
+    const staffSalesData = useMemo(() => {
+        return staff.map(member => {
+            const allAssigned = leads.filter(l => l.assigned_staff_id === member.id);
+            const convertedLeads = allAssigned.filter(l => l.status === 'converted');
+            const salesRevenue = convertedLeads.reduce((sum, l) => sum + (l.budget || 0), 0);
+            return {
+                name: member.full_name.split(' ')[0],
+                fullName: member.full_name,
+                totalLeads: allAssigned.length,
+                convertedLeads: convertedLeads.length,
+                salesRevenue,
+            };
+        }).sort((a, b) => b.totalLeads - a.totalLeads);
+    }, [staff, leads]);
+
+    const COLORS = ['#33A894', '#2c9180', '#257d6e', '#1f695c', '#18564a'];
 
     const handleAddStaff = () => {
         setSelectedStaff(undefined);
@@ -106,25 +128,66 @@ export function Staff() {
         <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Staff Management</h2>
-                    <p className="text-slate-500 mt-1">Manage team members, roles, and permissions.</p>
+                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">{t('staffMgmt')}</h2>
+                    <p className="text-slate-500 mt-1">{t('staffDesc')}</p>
                 </div>
                 <Button className="bg-[#33A894] hover:bg-[#2c9180] text-white" onClick={handleAddStaff}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Member
+                    <Plus className="mr-2 h-4 w-4" /> {t('addMember')}
                 </Button>
             </div>
+
+            <Card className="border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
+                    <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-[#33A894]" />
+                        {t('staffSalesPerf')}
+                    </CardTitle>
+                    <CardDescription>{t('revenueDesc')}</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <div className="h-[320px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={staffSalesData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
+                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} tickFormatter={(v) => `$${v}`} />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(51, 168, 148, 0.05)' }}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}
+                                    formatter={(value: any, name: any) => [
+                                        name === 'salesRevenue' ? `$${(value || 0).toLocaleString()}` : value,
+                                        name === 'salesRevenue' ? 'Revenue (Converted)' : name === 'totalLeads' ? 'Total Assigned' : 'Converted'
+                                    ]}
+                                    labelStyle={{ color: '#0f172a', fontWeight: 'bold', marginBottom: '4px' }}
+                                />
+                                <Legend formatter={(value) =>
+                                    value === 'totalLeads' ? 'Total Assigned Leads' :
+                                        value === 'convertedLeads' ? 'Converted' : 'Revenue'
+                                } />
+                                <Bar yAxisId="left" dataKey="totalLeads" radius={[6, 6, 0, 0]} barSize={28} fill="#94a3b8" />
+                                <Bar yAxisId="left" dataKey="convertedLeads" radius={[6, 6, 0, 0]} barSize={28}>
+                                    {staffSalesData.map((_entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length] || '#33A894'} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle>Team Members</CardTitle>
-                            <CardDescription>A list of all staff members having access to the dashboard.</CardDescription>
+                            <CardTitle>{t('teamMembers')}</CardTitle>
+                            <CardDescription>{t('teamDesc')}</CardDescription>
                         </div>
                         <div className="relative w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
                             <Input
-                                placeholder="Search..."
+                                placeholder={t('search')}
                                 className="pl-9"
                                 value={searchTerm}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
@@ -136,19 +199,20 @@ export function Staff() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[80px]">Avatar</TableHead>
-                                <TableHead className="font-semibold text-slate-700">Team Member</TableHead>
-                                <TableHead className="font-semibold text-slate-700">Role & Dept</TableHead>
-                                <TableHead className="font-semibold text-slate-700">Contact Details</TableHead>
-                                <TableHead className="font-semibold text-slate-700">Status</TableHead>
-                                <TableHead className="text-right font-semibold text-slate-700">Actions</TableHead>
+                                <TableHead className="w-[80px]">{t('avatar')}</TableHead>
+                                <TableHead className="font-semibold text-slate-700">{t('memberDetails')}</TableHead>
+                                <TableHead className="font-semibold text-slate-700">{t('roleDept')}</TableHead>
+                                <TableHead className="font-semibold text-slate-700">{t('contactDetails')}</TableHead>
+                                <TableHead className="font-semibold text-slate-700">Assigned Leads</TableHead>
+                                <TableHead className="font-semibold text-slate-700">{t('status')}</TableHead>
+                                <TableHead className="text-right font-semibold text-slate-700">{t('actions')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredStaff.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
-                                        No staff members found.
+                                    <TableCell colSpan={7} className="h-24 text-center">
+                                        {t('noStaffFound')}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -194,6 +258,25 @@ export function Staff() {
                                                 {member.status || 'Active'}
                                             </Badge>
                                         </TableCell>
+                                        <TableCell>
+                                            {(() => {
+                                                const total = leads.filter(l => l.assigned_staff_id === member.id).length;
+                                                const converted = leads.filter(l => l.assigned_staff_id === member.id && l.status === 'converted').length;
+                                                return (
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Users className="h-3.5 w-3.5 text-slate-400" />
+                                                            <span className="text-sm font-semibold text-slate-700">{total} leads</span>
+                                                        </div>
+                                                        {converted > 0 && (
+                                                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded w-fit">
+                                                                {converted} converted
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -203,12 +286,12 @@ export function Staff() {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleViewProfile(member)}>View Profile</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleEditStaff(member)}>Edit Details</DropdownMenuItem>
-                                                    <DropdownMenuItem>Change Role</DropdownMenuItem>
+                                                    <DropdownMenuLabel>{t('actions')}</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => handleViewProfile(member)}>{t('viewProfile')}</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleEditStaff(member)}>{t('editDetails')}</DropdownMenuItem>
+                                                    <DropdownMenuItem>{t('changeRole')}</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteStaff(member.id)}>Deactivate Account</DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteStaff(member.id)}>{t('deactivateAccount')}</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
@@ -223,9 +306,9 @@ export function Staff() {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{selectedStaff ? 'Edit Staff Member' : 'Add New Staff Member'}</DialogTitle>
+                        <DialogTitle>{selectedStaff ? t('editStaffTitle') : t('addStaffTitle')}</DialogTitle>
                         <DialogDescription>
-                            {selectedStaff ? 'Update the details of the staff member.' : 'Add a new member to your team.'}
+                            {selectedStaff ? t('editStaffDesc') : t('addStaffDesc')}
                         </DialogDescription>
                     </DialogHeader>
                     <StaffForm

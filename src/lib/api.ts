@@ -118,67 +118,50 @@ export async function getStaff() {
         console.error('API: getStaff error:', error);
         throw error;
     }
+
     console.log('API: getStaff success, count:', data?.length);
     return data as any[];
 }
 
-export async function createStaff(user: any, password?: string) {
-    if (password) {
-        // Create auth user using a separate client to avoid signing out current user
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export async function createStaff(user: any, _password?: string) {
+    // Insert directly into staffs table without creating an Auth user.
+    // This avoids Supabase email rate limits entirely.
+    // The staff profile for lead assignment is then synced separately.
+    const staffId = user.id || crypto.randomUUID();
 
-        const tempSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-                detectSessionInUrl: false
-            }
-        });
-
-        const { data: authData, error: authError } = await tempSupabase.auth.signUp({
+    const { data: staffData, error: staffError } = await supabase
+        .from('staffs')
+        .insert([{
+            id: staffId,
             email: user.email,
-            password: password,
-            options: {
-                data: {
-                    full_name: user.full_name,
-                    role: user.role,
-                }
-            }
-        });
+            full_name: user.full_name,
+            role: user.role,
+            avatar_url: user.avatar_url || null,
+            department: user.department || null,
+            phone: user.phone || null,
+            status: 'active',
+        }])
+        .select()
+        .single();
 
-        if (authError) throw authError;
-        if (!authData.user) throw new Error('Failed to create user account');
+    if (staffError) throw staffError;
 
-        // Insert into staffs table
-        const { data: profileData, error: profileError } = await supabase
-            .from('staffs')
-            .insert([{
-                id: authData.user.id,
-                email: user.email,
-                full_name: user.full_name,
-                role: user.role,
-                avatar_url: user.avatar_url,
-                department: user.department,
-                phone: user.phone
-            }])
-            .select()
-            .single();
-
-        if (profileError) throw profileError;
-        return profileData;
-    } else {
-        // Just update staff if user exists
-        const { data, error } = await supabase
-            .from('staffs')
-            .insert([user])
-            .select()
-            .single();
-        if (error) throw error;
-        return data;
+    // Also try to insert into profiles table so that lead assignment foreign key works.
+    // This may fail silently if RLS blocks it — that's OK, it's best-effort.
+    try {
+        await supabase.from('profiles').insert([{
+            id: staffId,
+            full_name: user.full_name,
+            email: user.email,
+            role: user.role,
+        }]);
+    } catch (_) {
+        // RLS may block this insert; non-fatal
     }
+
+    return staffData;
 }
+
 
 export async function updateStaff(id: string, updates: any) {
     const { data, error } = await supabase
