@@ -1,12 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppStore } from '@/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, PieChart, Pie, Cell } from 'recharts';
 import { KPICards } from '@/components/dashboard/KPICards';
 import { LeadsHeatmap } from './LeadsHeatmap';
-import { PieChart as PieChartIcon, TrendingUp, Filter, Download, Calendar as CalendarIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { PieChart as PieChartIcon, TrendingUp, Calendar as CalendarIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { subDays, isAfter, parseISO, startOfDay } from 'date-fns';
 
 const STATUS_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#a855f7', '#ef4444', '#3b82f6'];
 
@@ -20,14 +20,28 @@ const CustomBar = (props: any) => {
     );
 };
 
+import { useFilteredLeads } from '@/hooks/useFilteredLeads';
+
 export function LeadAnalyticsTab() {
-    const { leads } = useAppStore();
+    const { leads } = { leads: useFilteredLeads() };
+    const [days, setDays] = useState('30');
 
     const analytics = useMemo(() => {
-        const totalLeads = leads.length;
-        const convertedLeads = leads.filter(l => l.status === 'converted').length;
+        // Filter leads by period
+        const periodStart = startOfDay(subDays(new Date(), parseInt(days)));
+        const filteredLeads = leads.filter(lead => {
+            if (!lead.created_at) return true;
+            try {
+                return isAfter(parseISO(lead.created_at), periodStart);
+            } catch (e) {
+                return true;
+            }
+        });
+
+        const totalLeads = filteredLeads.length;
+        const convertedLeads = filteredLeads.filter(l => l.status === 'converted').length;
         const conversionRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0.0';
-        const totalRevenue = leads
+        const totalRevenue = filteredLeads
             .filter(l => l.status === 'converted')
             .reduce((sum, l) => sum + (l.budget || 0), 0);
 
@@ -38,7 +52,7 @@ export function LeadAnalyticsTab() {
             { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign', change: 15 },
         ];
 
-        const statusCounts = leads.reduce((acc, lead) => {
+        const statusCounts = filteredLeads.reduce((acc, lead) => {
             acc[lead.status] = (acc[lead.status] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
@@ -61,7 +75,7 @@ export function LeadAnalyticsTab() {
         ].filter(item => item.value > 0);
 
         return { kpis, funnelData, statusData, totalLeads };
-    }, [leads]);
+    }, [leads, days]);
 
     return (
         <div className="space-y-3 animate-in fade-in duration-500">
@@ -78,7 +92,7 @@ export function LeadAnalyticsTab() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    <Select defaultValue="30">
+                    <Select value={days} onValueChange={setDays}>
                         <SelectTrigger className="w-[140px] bg-white/50 border-white/30 text-[10px] font-bold uppercase h-9 rounded-xl shadow-inner active:scale-95 transition-transform">
                             <CalendarIcon className="mr-2 h-3.5 w-3.5 text-slate-500" />
                             <SelectValue placeholder="Range" />
@@ -89,16 +103,6 @@ export function LeadAnalyticsTab() {
                             <SelectItem value="90">Last 90 days</SelectItem>
                         </SelectContent>
                     </Select>
-
-                    <Button variant="outline" size="sm" className="bg-white/50 border-white/30 text-[10px] font-bold uppercase h-9 rounded-xl gap-2 active:scale-95 transition-transform">
-                        <Filter className="h-3.5 w-3.5 text-slate-500" />
-                        Source
-                    </Button>
-
-                    <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-800 text-[9px] font-bold uppercase h-8 rounded-lg gap-2 px-3 shadow-lg active:scale-95 transition-transform">
-                        <Download className="h-3 w-3" />
-                        Export
-                    </Button>
                 </div>
             </div>
 

@@ -8,6 +8,7 @@ import { useAppStore } from '@/store';
 import { useMemo, useState } from 'react';
 import { format, subDays, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 import {
     Dialog,
     DialogContent,
@@ -20,7 +21,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { useI18n } from '@/i18n';
 
 export function Dashboard() {
-    const { leads, tours, addLead } = useAppStore();
+    const { tours, addLead } = useAppStore();
+    const leads = useFilteredLeads();
     const navigate = useNavigate();
     const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
     const { t, language, setLanguage } = useI18n();

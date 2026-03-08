@@ -1,17 +1,37 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppStore } from '@/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDateRangePicker } from '@/components/dashboard/DateRangePicker';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import type { DateRange } from 'react-day-picker';
+import { subDays, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 
 const LEAD_SOURCE_COLORS = ['#E50914', '#a855f7', '#f59e0b', '#10b981', '#ef4444', '#6366f1'];
 
 export function ReportsTab() {
     const { leads } = useAppStore();
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: subDays(new Date(), 30),
+        to: new Date(),
+    });
 
     const analytics = useMemo(() => {
+        // Filter leads by date range
+        const filteredLeads = leads.filter(lead => {
+            if (!lead.created_at || !dateRange?.from || !dateRange?.to) return true;
+            try {
+                const leadDate = parseISO(lead.created_at);
+                return isWithinInterval(leadDate, {
+                    start: startOfDay(dateRange.from),
+                    end: endOfDay(dateRange.to)
+                });
+            } catch (e) {
+                return true;
+            }
+        });
+
         // Calculate Lead Sources
-        const sourcesMap = leads.reduce((acc, lead) => {
+        const sourcesMap = filteredLeads.reduce((acc, lead) => {
             const source = lead.source || 'Unknown';
             acc[source] = (acc[source] || 0) + 1;
             return acc;
@@ -24,48 +44,32 @@ export function ReportsTab() {
         }));
 
         // Calculate Monthly Revenue (from converted leads)
-        const revenueMap: Record<string, number> = {};
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-        // Initialize last 6 months (or just current year)
-        // For simplicity, let's just group by month name for all time
-        // Proper implementation would handle years, but this is a good start
+        // Initialize all 12 months with 0 revenue
+        const monthlyRevenueData = months.map(name => ({ name, revenue: 0 }));
 
-        leads.forEach(lead => {
+        filteredLeads.forEach(lead => {
             if (lead.status === 'converted' && lead.created_at) {
                 const date = new Date(lead.created_at);
-                const monthName = months[date.getMonth()];
-                revenueMap[monthName] = (revenueMap[monthName] || 0) + (lead.budget || 0);
+                const monthIndex = date.getMonth();
+                if (monthIndex >= 0 && monthIndex < 12) {
+                    monthlyRevenueData[monthIndex].revenue += (lead.budget || 0);
+                }
             }
         });
 
-        const monthlyRevenueData = Object.entries(revenueMap).map(([name, revenue]) => ({
-            name,
-            revenue
-        })).sort((a, b) => months.indexOf(a.name) - months.indexOf(b.name));
-
-        // Ensure we have at least some empty months for visual balance if empty
-        if (monthlyRevenueData.length === 0) {
-            const currentMonth = new Date().getMonth();
-            for (let i = 0; i <= currentMonth; i++) {
-                monthlyRevenueData.push({ name: months[i], revenue: 0 });
-            }
-        }
-
         return { leadSourcesData, monthlyRevenueData };
-    }, [leads]);
+    }, [leads, dateRange]);
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-4">
-                <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium text-muted-foreground">From</span>
-                    <CalendarDateRangePicker />
-                </div>
-                <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium text-muted-foreground">To</span>
-                    <CalendarDateRangePicker />
-                </div>
+            <div className="flex flex-col gap-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Analysis Period</span>
+                <CalendarDateRangePicker
+                    date={dateRange}
+                    onDateChange={setDateRange}
+                />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -109,9 +113,8 @@ export function ReportsTab() {
 
                 {/* Monthly Revenue Chart */}
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
+                    <CardHeader>
                         <CardTitle>Monthly Revenue</CardTitle>
-                        <DownloadIcon className="h-4 w-4 text-muted-foreground cursor-pointer hover:text-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="h-[300px] w-full">
@@ -148,23 +151,3 @@ export function ReportsTab() {
     );
 }
 
-function DownloadIcon(props: React.SVGProps<SVGSVGElement>) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" x2="12" y1="15" y2="3" />
-        </svg>
-    )
-}

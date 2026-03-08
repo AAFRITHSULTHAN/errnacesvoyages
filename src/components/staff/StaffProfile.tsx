@@ -5,12 +5,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Mail, Phone, Calendar, DollarSign, Users, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Mail, Phone, DollarSign, Users, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { useMemo } from 'react';
 import { useAppStore } from '@/store';
 import { format, subMonths, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+
 
 interface StaffProfileProps {
     staff: any;
@@ -22,7 +23,7 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
     const leads = useAppStore(state => state.leads);
 
     const stats = useMemo(() => {
-        if (!staff) return { dealsClosed: 0, totalRevenue: 0, conversion: 0, totalLeads: 0, performanceData: [], recentActivity: [] };
+        if (!staff) return { dealsClosed: 0, totalRevenue: 0, conversion: 0, totalLeads: 0, performanceData: [], staffLeads: [] };
 
         const staffLeads = leads.filter(l => l.assigned_staff_id === staff.id);
         const totalLeads = staffLeads.length;
@@ -32,12 +33,11 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
         const totalRevenue = convertedLeads.reduce((sum, l) => sum + (l.budget || 0), 0);
         const conversion = totalLeads > 0 ? Math.round((dealsClosed / totalLeads) * 100) : 0;
 
-        // Last 6 months performance
+        // Performance Trend
         const performanceData = [];
         for (let i = 5; i >= 0; i--) {
             const date = subMonths(new Date(), i);
             const monthName = format(date, 'MMM');
-
             const monthSales = convertedLeads
                 .filter(l => {
                     if (!l.created_at) return false;
@@ -45,46 +45,62 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
                     return ldate.getMonth() === date.getMonth() && ldate.getFullYear() === date.getFullYear();
                 })
                 .reduce((sum, l) => sum + (l.budget || 0), 0);
-
             performanceData.push({ name: monthName, sales: monthSales });
         }
 
-        const recentActivity = [...staffLeads]
-            .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-            .slice(0, 5);
-
-        return { dealsClosed, totalRevenue, conversion, totalLeads, performanceData, recentActivity };
+        return { dealsClosed, totalRevenue, conversion, totalLeads, performanceData, staffLeads };
     }, [staff, leads]);
 
     if (!staff) return null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl rounded-3xl overflow-hidden">
-                <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 text-white relative">
-                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
-                        <Avatar className="h-24 w-24 border-4 border-white/20 shadow-xl ring-4 ring-white/10">
-                            <AvatarImage src={staff?.avatar_url} alt={staff?.full_name} />
-                            <AvatarFallback className="text-2xl bg-white/20 text-white font-black">
-                                {staff?.full_name?.[0] || 'U'}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 text-center md:text-left space-y-2">
-                            <div className="flex flex-col md:flex-row md:items-center gap-3">
-                                <h3 className="text-3xl font-black tracking-tight">{staff?.full_name || 'Staff Member'}</h3>
-                                <Badge className="w-fit mx-auto md:mx-0 bg-white/20 text-white border-white/20 hover:bg-white/30 transition-colors uppercase text-[10px] font-black tracking-widest px-3">
-                                    {staff?.status || 'Active'}
-                                </Badge>
-                            </div>
-                            <p className="text-indigo-100 font-bold uppercase text-xs tracking-widest">{staff?.role?.replace('_', ' ') || 'Staff'}</p>
+            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white/95 backdrop-blur-xl">
+                {/* Premium Mesh Gradient Header */}
+                <div className="relative p-7 text-white overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700" />
+                    <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)`, backgroundSize: '24px 24px' }} />
+                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl animate-pulse" />
 
-                            <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-4 pt-4 border-t border-white/10">
-                                <div className="flex items-center gap-2 text-sm font-medium text-indigo-50">
-                                    <Mail className="h-4 w-4 opacity-70" /> {staff?.email}
+                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+                        <div className="relative group">
+                            <div className="absolute -inset-1 bg-gradient-to-tr from-white/40 to-white/0 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-500" />
+                            <Avatar className="h-24 w-24 border-4 border-white/30 shadow-2xl relative">
+                                <AvatarImage src={staff?.avatar_url} alt={staff?.full_name} className="object-cover" />
+                                <AvatarFallback className="text-4xl bg-gradient-to-br from-white/20 to-white/5 text-white font-black">
+                                    {staff?.full_name?.[0] || 'U'}
+                                </AvatarFallback>
+                            </Avatar>
+                        </div>
+
+                        <div className="flex-1 text-center md:text-left space-y-3">
+                            <div className="flex flex-col md:flex-row md:items-center gap-4">
+                                <h3 className="text-4xl font-black tracking-tighter drop-shadow-sm">{staff?.full_name || 'Staff Member'}</h3>
+                                <div className="flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/20 w-fit mx-auto md:mx-0">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">{staff?.status || 'Active'}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-center md:justify-start gap-2">
+                                <span className="text-indigo-100/90 font-black uppercase text-[11px] tracking-[0.25em] py-1 px-3 bg-black/10 rounded-lg">
+                                    {staff?.role?.replace('_', ' ') || 'Staff'}
+                                </span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                                <span className="text-indigo-100/90 font-black uppercase text-[11px] tracking-[0.25em]">
+                                    {staff?.department || 'Operations'}
+                                </span>
+                            </div>
+
+                            <div className="flex flex-wrap justify-center md:justify-start gap-5 pt-5 mt-2 border-t border-white/10">
+                                <div className="flex items-center gap-2.5 text-sm font-bold text-indigo-50/90 hover:text-white transition-colors cursor-default">
+                                    <div className="p-1.5 bg-white/10 rounded-lg"><Mail className="h-3.5 w-3.5" /></div>
+                                    {staff?.email}
                                 </div>
                                 {staff?.phone && (
-                                    <div className="flex items-center gap-2 text-sm font-medium text-indigo-50">
-                                        <Phone className="h-4 w-4 opacity-70" /> {staff.phone}
+                                    <div className="flex items-center gap-2.5 text-sm font-bold text-indigo-50/90 hover:text-white transition-colors cursor-default">
+                                        <div className="p-1.5 bg-white/10 rounded-lg"><Phone className="h-3.5 w-3.5" /></div>
+                                        {staff.phone}
                                     </div>
                                 )}
                             </div>
@@ -92,113 +108,145 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
                     </div>
                 </div>
 
-                <div className="p-8 space-y-8 bg-slate-50">
-                    {/* Professional Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <Card className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
-                            <CardContent className="p-5 flex flex-col items-center justify-center text-center">
-                                <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 mb-3 group-hover:scale-110 transition-transform">
-                                    <Users className="h-5 w-5" />
-                                </div>
-                                <div className="text-2xl font-black text-slate-900">{stats.totalLeads}</div>
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Assigned</div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
-                            <CardContent className="p-5 flex flex-col items-center justify-center text-center">
-                                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 mb-3 group-hover:scale-110 transition-transform">
-                                    <CheckCircle2 className="h-5 w-5" />
-                                </div>
-                                <div className="text-2xl font-black text-slate-900">{stats.dealsClosed}</div>
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Converted</div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
-                            <CardContent className="p-5 flex flex-col items-center justify-center text-center">
-                                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 mb-3 group-hover:scale-110 transition-transform">
-                                    <DollarSign className="h-5 w-5" />
-                                </div>
-                                <div className="text-2xl font-black text-slate-900">${stats.totalRevenue.toLocaleString()}</div>
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Revenue</div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-shadow">
-                            <CardContent className="p-5 flex flex-col items-center justify-center text-center">
-                                <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 mb-3 group-hover:scale-110 transition-transform">
-                                    <TrendingUp className="h-5 w-5" />
-                                </div>
-                                <div className="text-2xl font-black text-slate-900">{stats.conversion}%</div>
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Efficiency</div>
-                            </CardContent>
-                        </Card>
+                <div className="p-7 pb-12 space-y-10 bg-slate-50/30">
+                    {/* Refined Stats Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                            { label: 'Assigned', value: stats.totalLeads, icon: Users, color: 'violet' },
+                            { label: 'Converted', value: stats.dealsClosed, icon: CheckCircle2, color: 'emerald' },
+                            { label: 'Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'indigo' },
+                            { label: 'Efficiency', value: `${stats.conversion}%`, icon: TrendingUp, color: 'amber' }
+                        ].map((item) => (
+                            <Card key={item.label} className="border-none shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] bg-white overflow-hidden group hover:-translate-y-1 transition-all duration-300 rounded-[1.5rem]">
+                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                    <div className={cn(
+                                        "p-2.5 rounded-xl mb-3 transition-all duration-500 group-hover:rotate-6",
+                                        item.color === 'violet' ? "bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white" :
+                                            item.color === 'emerald' ? "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white" :
+                                                item.color === 'indigo' ? "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white" :
+                                                    "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"
+                                    )}>
+                                        <item.icon className="h-4 w-4" />
+                                    </div>
+                                    <div className="text-xl font-black text-slate-800 tracking-tight">{item.value}</div>
+                                    <div className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">{item.label}</div>
+                                </CardContent>
+                            </Card>
+                        ))}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* Performance Chart */}
+                    <div className="space-y-10">
+                        {/* Monthly Performance with Luxury Polish */}
                         <div className="space-y-4">
-                            <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Monthly Performance</h4>
-                            <Card className="border-none shadow-sm bg-white p-6">
-                                <div className="h-[200px] w-full">
+                            <div className="flex items-center gap-3">
+                                <div className="h-1 w-6 rounded-full bg-indigo-600" />
+                                <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em]">Monthly Performance</h4>
+                            </div>
+                            <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] bg-white p-5 rounded-[2rem]">
+                                <div className="h-[150px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={stats.performanceData}>
                                             <defs>
-                                                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#4F46E5" stopOpacity={1} />
-                                                    <stop offset="100%" stopColor="#6366F1" stopOpacity={0.8} />
+                                                <linearGradient id="barGradPremium" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
+                                                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.7} />
                                                 </linearGradient>
+                                                <filter id="shadow">
+                                                    <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#6366f1" floodOpacity="0.15" />
+                                                </filter>
                                             </defs>
                                             <XAxis
                                                 dataKey="name"
-                                                stroke="#94a3b8"
+                                                stroke="#cbd5e1"
                                                 fontSize={10}
-                                                fontWeight={700}
+                                                fontWeight={800}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 dy={10}
                                             />
                                             <YAxis hide />
                                             <Tooltip
-                                                cursor={{ fill: 'rgba(79, 70, 229, 0.05)' }}
-                                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
+                                                cursor={{ fill: 'rgba(99, 102, 241, 0.03)', radius: 10 }}
+                                                contentStyle={{
+                                                    borderRadius: '16px',
+                                                    border: 'none',
+                                                    boxShadow: '0 15px 30px rgba(0,0,0,0.08)',
+                                                    fontWeight: '800',
+                                                    padding: '10px 16px',
+                                                    fontSize: '11px',
+                                                    background: 'rgba(255,255,255,0.98)',
+                                                    backdropFilter: 'blur(10px)'
+                                                }}
                                                 formatter={(value) => [`$${(value || 0).toLocaleString()}`, 'Revenue']}
                                             />
-                                            <Bar dataKey="sales" fill="url(#barGrad)" radius={[6, 6, 6, 6]} barSize={32} />
+                                            <Bar
+                                                dataKey="sales"
+                                                fill="url(#barGradPremium)"
+                                                radius={[6, 6, 6, 6]}
+                                                barSize={24}
+                                                filter="url(#shadow)"
+                                            />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
                             </Card>
                         </div>
 
-                        {/* Activity Timeline */}
+                        {/* All Assigned Clients Luxury Table */}
                         <div className="space-y-4">
-                            <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Recent Activity</h4>
-                            <div className="space-y-3">
-                                {stats.recentActivity.length > 0 ? stats.recentActivity.map((lead) => (
-                                    <div key={lead.id} className="flex items-center gap-4 p-3 bg-white rounded-2xl shadow-sm border border-slate-100 group hover:border-indigo-200 transition-colors">
-                                        <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-50 transition-colors">
-                                            <Calendar className="h-5 w-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-extrabold text-slate-900 truncate">Lead: {lead.name}</p>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                <span className={cn(
-                                                    "text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md",
-                                                    lead.status === 'converted' ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
-                                                )}>
-                                                    {lead.status}
-                                                </span>
-                                                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                                                    {format(parseISO(lead.created_at || new Date().toISOString()), 'MMM d, h:mm a')}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div className="text-sm text-slate-400 font-bold text-center py-12 bg-slate-100/50 rounded-3xl border-2 border-dashed border-slate-200">
-                                        No recent activity records.
-                                    </div>
-                                )}
+                            <div className="flex items-center gap-3">
+                                <div className="h-1 w-6 rounded-full bg-indigo-600" />
+                                <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em]">Client Directory ({stats.totalLeads})</h4>
                             </div>
+                            <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] bg-white rounded-[2rem] overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50/50 backdrop-blur-sm border-b border-slate-100">
+                                            <tr>
+                                                <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Client Identity</th>
+                                                <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
+                                                <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Budget</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {stats.staffLeads.length > 0 ? stats.staffLeads.map((lead) => (
+                                                <tr key={lead.id} className="group hover:bg-indigo-50/30 transition-all duration-300">
+                                                    <td className="px-6 py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm transition-transform group-hover:scale-110">
+                                                                {lead.name[0]}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[12px] font-black text-slate-800 leading-tight">{lead.name}</p>
+                                                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Joined {format(parseISO(lead.created_at), 'MMM yyyy')}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-3">
+                                                        <div className="flex justify-center">
+                                                            <Badge className={cn(
+                                                                "uppercase text-[7px] font-black tracking-[0.15em] px-2 py-0.5 rounded-full border-none shadow-sm",
+                                                                lead.status === 'converted' ? "bg-emerald-500 text-white" :
+                                                                    lead.status === 'lost' ? "bg-rose-500 text-white" :
+                                                                        "bg-indigo-500 text-white"
+                                                            )}>
+                                                                {lead.status}
+                                                            </Badge>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-3 text-right">
+                                                        <p className="text-[12px] font-black text-slate-900 tracking-tight">${(lead.budget || 0).toLocaleString()}</p>
+                                                    </td>
+                                                </tr>
+                                            )) : (
+                                                <tr>
+                                                    <td colSpan={3} className="px-6 py-10 text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] italic">No active records found.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </Card>
                         </div>
                     </div>
                 </div>

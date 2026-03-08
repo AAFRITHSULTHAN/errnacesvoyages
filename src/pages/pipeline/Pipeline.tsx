@@ -31,8 +31,10 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Lead } from '@/types';
 import { KPICards } from '@/components/dashboard/KPICards';
 import { useI18n } from '@/i18n';
+import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 export function Pipeline() {
-    const { leads, fetchLeads, addLead, updateLead } = useAppStore();
+    const { fetchLeads, addLead, updateLead } = useAppStore();
+    const leads = useFilteredLeads();
     const [activeId, setActiveId] = useState<string | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | undefined>(undefined);

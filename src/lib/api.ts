@@ -1,15 +1,33 @@
 import { supabase } from './supabase';
 import type { Lead, TourPackage } from '@/types';
+import { createClient } from '@supabase/supabase-js';
+
+// A secondary client that explicitly uses the anon key for reads.
+// This ensures custom-auth staff sessions (no Supabase JWT) can still read data.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const anonClient = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- LEADS ---
 
 export async function getLeads() {
-    const { data, error } = await supabase
+    // Try with the current session first, fall back to anon client
+    let client = supabase;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        console.log('API: No active session, using anon client for getLeads');
+        client = anonClient;
+    }
+
+    const { data, error } = await client
         .from('leads')
         .select('*')
         .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+        console.error('API: getLeads error:', error);
+        throw error;
+    }
     return data as Lead[];
 }
 
@@ -88,7 +106,14 @@ export async function uploadTourImage(file: File) {
 }
 
 export async function getTours() {
-    const { data, error } = await supabase
+    // Try with current session first, fall back to anon client
+    let client = supabase;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        client = anonClient;
+    }
+
+    const { data, error } = await client
         .from('tours')
         .select('*')
         .order('created_at', { ascending: false });

@@ -15,7 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
-    const { setUser, user } = useAppStore();
+    const { setUser, user, fetchLeads, fetchTours } = useAppStore();
 
     useEffect(() => {
         let mounted = true;
@@ -46,6 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         const profile = JSON.parse(staffSessionStr);
                         setUser(profile as User);
                         console.log('Restored custom staff session:', profile.email);
+                        // Eagerly fetch data for staff session
+                        fetchLeads();
+                        fetchTours();
                     } catch (_) {
                         localStorage.removeItem('staff_session');
                     }
@@ -96,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         id: session.user.id,
                         email: session.user.email!,
                         full_name: session.user.user_metadata.full_name || 'Admin',
-                        role: session.user.email === 'admin@errancesvoyages.com' ? 'admin' : 'sales_executive',
+                        role: (session.user.email === 'admin@errnacesvoyages.com' || session.user.email?.startsWith('admin@')) ? 'admin' : 'sales_executive',
                         avatar_url: session.user.user_metadata.avatar_url,
                     };
                     setUser(fallbackUser);
@@ -128,6 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(staffProfile as User);
                     localStorage.setItem('staff_session', JSON.stringify(staffProfile));
                     console.log('Custom staff login success:', email);
+                    // Eagerly fetch data since there's no Supabase session to trigger Layout's effect
+                    fetchLeads();
+                    fetchTours();
                 } else {
                     // Both failed
                     throw authError;
