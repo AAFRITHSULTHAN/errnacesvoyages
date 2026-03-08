@@ -152,8 +152,8 @@ export function Staff() {
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="pt-8 px-6 pb-8">
-                    <div className="h-[360px] w-full">
+                <CardContent className="pt-6 px-6 pb-6">
+                    <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={staffSalesData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }} barGap={6}>
                                 <defs>

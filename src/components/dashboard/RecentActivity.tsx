@@ -19,15 +19,15 @@ interface RecentActivityProps {
 
 export function RecentActivity({ activities }: RecentActivityProps) {
     return (
-        <Card className="h-full border border-white/20 bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.12)] hover:-translate-y-1 transition-all duration-300 rounded-2xl overflow-hidden flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between py-5 px-6 flex-none">
-                <CardTitle className="text-sm font-semibold text-slate-700">Recent Activity</CardTitle>
+        <Card className="h-full border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all duration-300 rounded-xl overflow-hidden flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between py-4 px-4 flex-none">
+                <CardTitle className="text-sm font-semibold text-slate-800">Recent Activity</CardTitle>
             </CardHeader>
-            <CardContent className="px-6 pb-6 flex-1 min-h-0">
-                <ScrollArea className="h-full pr-4">
-                    <div className="space-y-6">
+            <CardContent className="px-4 pb-4 flex-1 min-h-0">
+                <ScrollArea className="h-full pr-3">
+                    <div className="space-y-4">
                         {activities.length === 0 ? (
-                            <p className="text-sm text-slate-500 text-center py-6 font-medium">No recent activity yet.</p>
+                            <p className="text-sm text-slate-500 text-center py-4 font-medium">No recent activity yet.</p>
                         ) : (
                             activities.map((activity) => (
                                 <div key={activity.id} className="flex items-center group">

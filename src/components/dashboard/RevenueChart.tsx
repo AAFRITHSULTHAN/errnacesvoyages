@@ -11,12 +11,12 @@ export function RevenueChart({ data }: RevenueChartProps) {
     const totalRevenue = data.reduce((sum, item) => sum + item.revenue, 0);
 
     return (
-        <Card className="col-span-3 border border-white/20 bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.12)] hover:-translate-y-1 transition-all duration-300 rounded-2xl overflow-hidden">
-            <CardHeader className="pb-0 pt-5 px-5">
-                <CardTitle className="text-sm font-semibold text-slate-600">Revenue by Package</CardTitle>
+        <Card className="col-span-3 border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all duration-300 rounded-xl overflow-hidden">
+            <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-semibold text-slate-800">Revenue by Package</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-                <div className="h-[200px] w-full relative -mt-4">
+                <div className="h-[180px] w-full relative">
                     {data.length === 0 ? (
                         <div className="flex items-center justify-center h-full text-slate-500 text-sm">
                             No revenue data available.
@@ -58,15 +58,15 @@ export function RevenueChart({ data }: RevenueChartProps) {
                                     />
                                 </PieChart>
                             </ResponsiveContainer>
-                            <div className="absolute inset-x-0 bottom-[18%] flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-2xl font-bold text-slate-900 tracking-tight">${totalRevenue.toLocaleString()}</span>
-                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Total Revenue</span>
+                            <div className="absolute inset-x-0 bottom-[15%] flex flex-col items-center justify-center pointer-events-none">
+                                <span className="text-lg font-bold text-slate-900 tracking-tight">${totalRevenue.toLocaleString()}</span>
+                                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Total Revenue</span>
                             </div>
                         </>
                     )}
                 </div>
                 {data.length > 0 && (
-                    <div className="px-5 pb-5 flex flex-wrap justify-center gap-x-6 gap-y-2">
+                    <div className="px-4 pb-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
                         {data.map((item, index) => (
                             <div key={item.name} className="flex items-center gap-2">
                                 <div
