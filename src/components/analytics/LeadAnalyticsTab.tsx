@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useAppStore } from '@/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, PieChart, Pie, Cell } from 'recharts';
 import { KPICards } from '@/components/dashboard/KPICards';
