@@ -54,36 +54,38 @@ export function TourList() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/40 backdrop-blur-md p-6 rounded-3xl border border-white/60 shadow-sm shadow-indigo-900/5">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">{t('tourPackages')}</h2>
-                    <p className="text-slate-500 mt-1">{t('tourPackagesDesc')}</p>
+                    <h2 className="text-3xl font-black tracking-tight text-slate-900 uppercase">{t('tourPackages')}</h2>
+                    <p className="text-slate-500 font-medium">{t('tourPackagesDesc')}</p>
                 </div>
-                <Button className="bg-[#33A894] hover:bg-[#2c9180] text-white" onClick={handleAddTour}>
-                    <Plus className="mr-2 h-4 w-4" /> {t('createPackage')}
+                <Button className="bg-[#33A894] hover:bg-[#2c9180] text-white h-11 px-6 rounded-xl shadow-md shadow-[#33A894]/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 font-bold" onClick={handleAddTour}>
+                    <Plus className="h-4 w-4" /> {t('createPackage')}
                 </Button>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <div className="flex flex-col sm:flex-row gap-4 bg-white/60 backdrop-blur-sm p-5 rounded-2xl border border-white/80 shadow-sm shadow-indigo-900/5 items-center">
+                <div className="relative flex-1 w-full">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                     <Input
                         placeholder={t('searchTour')}
-                        className="pl-9 bg-white border-slate-200"
+                        className="pl-10 h-11 bg-white/80 border-slate-200/60 rounded-xl focus:ring-indigo-500/20"
                         value={searchTerm}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                     />
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                     <Select value={sortOrder} onValueChange={setSortOrder}>
-                        <SelectTrigger className="w-[180px] bg-white border-slate-200">
-                            <Filter className="w-4 h-4 mr-2" />
-                            <SelectValue placeholder="Sort by" />
+                        <SelectTrigger className="w-full sm:w-[200px] h-11 bg-white/80 border-slate-200/60 rounded-xl font-bold text-slate-700">
+                            <div className="flex items-center gap-2">
+                                <Filter className="w-4 h-4 text-slate-400" />
+                                <SelectValue placeholder="Sort by" />
+                            </div>
                         </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="price-asc">{t('priceLowHigh')}</SelectItem>
-                            <SelectItem value="price-desc">{t('priceHighLow')}</SelectItem>
-                            <SelectItem value="duration-asc">{t('durationShortest')}</SelectItem>
+                        <SelectContent className="rounded-xl border-slate-200 shadow-xl">
+                            <SelectItem value="price-asc" className="rounded-lg">{t('priceLowHigh')}</SelectItem>
+                            <SelectItem value="price-desc" className="rounded-lg">{t('priceHighLow')}</SelectItem>
+                            <SelectItem value="duration-asc" className="rounded-lg">{t('durationShortest')}</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

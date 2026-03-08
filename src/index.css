@@ -4,7 +4,8 @@
 
 @layer base {
   :root {
-    --background: 200 27.3% 97.8%; /* #F8FAFB */
+    --background: 200 27.3% 97.8%;
+    /* #F8FAFB */
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -111,10 +112,28 @@
 }
 
 @layer utilities {
+
   /* Enforce #F8FAFB globally without altering component files */
   body,
   .h-screen.bg-slate-50,
   .min-h-screen.bg-slate-50 {
     background-color: #F8FAFB !important;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .glass-card {
+    @apply bg-white/40 backdrop-blur-md border border-white/60 shadow-sm shadow-indigo-900/5;
+  }
+
+  .premium-shadow {
+    box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.1);
   }
 }

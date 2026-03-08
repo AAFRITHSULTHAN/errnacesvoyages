@@ -164,17 +164,19 @@ export function Leads() {
 
     return (
         <div className="min-h-[calc(100vh-6rem)] flex flex-col gap-6 animate-in fade-in duration-500 pb-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/40 backdrop-blur-md p-6 rounded-3xl border border-white/60 shadow-sm shadow-indigo-900/5">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">{t('leads')}</h2>
-                    <p className="text-slate-500 mt-1">{t('manageLeadsDesc')}</p>
+                    <h2 className="text-3xl font-black tracking-tight text-slate-900 uppercase">{t('leads')}</h2>
+                    <p className="text-slate-500 font-medium">{t('manageLeadsDesc')}</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Button className="bg-[#33A894] hover:bg-[#2c9180] text-white shadow-md shadow-[#33A894]/20 transition-all hover:scale-105" onClick={handleAddLead}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        {t('addLead')}
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <Button
+                        className="bg-[#33A894] hover:bg-[#2c9180] text-white h-11 px-6 rounded-xl shadow-md shadow-[#33A894]/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 font-bold"
+                        onClick={handleAddLead}
+                    >
+                        <Plus className="h-4 w-4" /> {t('addLead')}
                     </Button>
-                    <div className="flex items-center bg-white rounded-lg p-1 border border-slate-200 shadow-sm">
+                    <div className="flex items-center bg-white/80 backdrop-blur-sm rounded-xl p-1 border border-slate-200/60 shadow-sm">
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -182,13 +184,23 @@ export function Leads() {
                             accept=".csv,.json"
                             onChange={handleFileChange}
                         />
-                        <Button variant="ghost" size="sm" className="h-8 text-slate-600 hover:text-indigo-600" onClick={handleImportClick}>
-                            <Upload className="w-4 h-4 mr-2" />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 px-4 text-slate-600 hover:text-indigo-600 font-bold rounded-lg transition-colors"
+                            onClick={handleImportClick}
+                        >
+                            <Upload className="w-4 h-4 mr-2 opacity-70" />
                             {t('import')}
                         </Button>
-                        <div className="w-px h-4 bg-slate-200 mx-1" />
-                        <Button variant="ghost" size="sm" className="h-8 text-slate-600 hover:text-indigo-600" onClick={handleExport}>
-                            <Download className="w-4 h-4 mr-2" />
+                        <div className="w-px h-4 bg-slate-200/60 mx-1" />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 px-4 text-slate-600 hover:text-indigo-600 font-bold rounded-lg transition-colors"
+                            onClick={handleExport}
+                        >
+                            <Download className="w-4 h-4 mr-2 opacity-70" />
                             {t('export')}
                         </Button>
                     </div>

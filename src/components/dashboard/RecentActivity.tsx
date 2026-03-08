@@ -19,38 +19,49 @@ interface RecentActivityProps {
 
 export function RecentActivity({ activities }: RecentActivityProps) {
     return (
-        <Card className="h-full border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all duration-300 rounded-xl overflow-hidden flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between py-4 px-4 flex-none">
-                <CardTitle className="text-sm font-semibold text-slate-800">Recent Activity</CardTitle>
+        <Card className="h-full border-none bg-white/70 backdrop-blur-sm shadow-sm hover:shadow-xl transition-all duration-500 rounded-3xl overflow-hidden flex flex-col ring-1 ring-slate-200/50">
+            <CardHeader className="flex flex-row items-center justify-between py-6 px-8 flex-none border-b border-slate-100/50 bg-slate-50/30">
+                <CardTitle className="text-sm font-black text-slate-900 uppercase tracking-widest">Recent Activity Timeline</CardTitle>
             </CardHeader>
-            <CardContent className="px-4 pb-4 flex-1 min-h-0">
-                <ScrollArea className="h-full pr-3">
-                    <div className="space-y-4">
+            <CardContent className="px-8 py-6 flex-1 min-h-0">
+                <ScrollArea className="h-full pr-4">
+                    <div className="space-y-6">
                         {activities.length === 0 ? (
-                            <p className="text-sm text-slate-500 text-center py-4 font-medium">No recent activity yet.</p>
+                            <div className="flex flex-col items-center justify-center py-12">
+                                <p className="text-xs text-slate-400 font-black uppercase tracking-widest italic">No recent activity yet.</p>
+                            </div>
                         ) : (
                             activities.map((activity) => (
-                                <div key={activity.id} className="flex items-center group">
-                                    <Avatar className="h-10 w-10 border-2 border-white shadow-sm ring-1 ring-slate-100">
+                                <div key={activity.id} className="flex items-start group relative">
+                                    <div className="absolute left-5 top-10 bottom-0 w-px bg-slate-100 group-last:hidden" />
+                                    <Avatar className="h-10 w-10 border-2 border-white shadow-md ring-1 ring-slate-100 transition-transform group-hover:scale-110 duration-300 z-10 shrink-0">
                                         <AvatarImage src={activity.avatar} alt={activity.user} />
-                                        <AvatarFallback className="bg-slate-50 text-slate-600 font-bold text-xs">{activity.user[0]}</AvatarFallback>
+                                        <AvatarFallback className="bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 font-bold text-xs uppercase">{activity.user[0]}</AvatarFallback>
                                     </Avatar>
-                                    <div className="ml-4 flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <div className="space-y-0.5">
-                                                <p className="text-sm font-bold text-slate-900 leading-none group-hover:text-blue-600 transition-colors">
-                                                    {activity.user} <span className="font-medium text-slate-500">{activity.action}</span>
+                                    <div className="ml-5 flex-1 pt-0.5">
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <p className="text-sm font-black text-slate-900 leading-none transition-colors group-hover:text-indigo-600">
+                                                    {activity.user} <span className="font-bold text-slate-400 uppercase text-[10px] tracking-widest ml-1">{activity.action}</span>
                                                 </p>
-                                                <p className="text-[11px] font-medium text-slate-400">
-                                                    {activity.target} • {activity.time}
-                                                </p>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 shadow-sm">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">Live</span>
+                                                    </div>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-                                                <span className="text-[11px] font-bold text-slate-600 w-16 text-right">9:07 PM</span>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-900">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
+                                            <div className="flex items-center gap-2 mt-1.5">
+                                                <p className="text-[11px] font-black text-slate-500 uppercase tracking-tighter truncate max-w-[200px]">
+                                                    {activity.target}
+                                                </p>
+                                                <span className="text-slate-300 text-[10px]">•</span>
+                                                <p className="text-[11px] font-bold text-slate-400 italic">
+                                                    {activity.time}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -59,8 +70,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
                         )}
                     </div>
                     <ScrollBar
-                        className="bg-slate-100/50 rounded-full w-2"
-                        thumbClassName="bg-slate-400 hover:bg-slate-500 transition-colors"
+                        className="bg-slate-100/50 rounded-full w-1.5"
                     />
                 </ScrollArea>
             </CardContent>

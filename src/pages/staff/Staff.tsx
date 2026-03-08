@@ -76,19 +76,11 @@ export function Staff() {
             // Sort by revenue first, then conversion rate
             if (b.salesRevenue !== a.salesRevenue) return b.salesRevenue - a.salesRevenue;
             return b.conversionRate - a.conversionRate;
-        }).map((staff, index) => {
-            // Assign Gamification Ranking Badges
-            let rankBadge = '⚠'; // Default: Needs attention
-            let colorRing = 'border-rose-200'; // Default: Red ring
-
-            if (staff.convertedLeads > 0) {
-                if (index === 0) { rankBadge = '🏆'; colorRing = 'border-amber-400'; } // 1st
-                else if (index === 1) { rankBadge = '🥈'; colorRing = 'border-slate-300'; } // 2nd
-                else if (index === 2) { rankBadge = '🥉'; colorRing = 'border-amber-700'; } // 3rd
-                else { rankBadge = '👍'; colorRing = 'border-emerald-200'; } // Average/Good
-            }
-
-            return { ...staff, rankBadge, colorRing, rankIndex: index + 1 };
+        }).map((staff) => {
+            return {
+                ...staff,
+                colorRing: 'border-slate-200' // Simple neutral ring
+            };
         });
     }, [staff, leads]);
 
@@ -125,11 +117,11 @@ export function Staff() {
                             <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-sm">{data.name[0]}</AvatarFallback>
                         </Avatar>
                         <div>
-                            <p className="font-extrabold text-slate-900 text-base flex items-center gap-1.5">
-                                {data.fullName} {data.rankBadge}
+                            <p className="font-extrabold text-slate-900 text-base">
+                                {data.fullName}
                             </p>
                             <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
-                                Rank #{data.rankIndex}
+                                {formatRole(staff.find(s => s.id === data.id)?.role || 'Member')}
                             </p>
                         </div>
                     </div>
@@ -165,7 +157,6 @@ export function Staff() {
             <g transform={`translate(${x},${y})`}>
                 <foreignObject x="-30" y="8" width="60" height="50">
                     <div className="flex flex-col items-center justify-center w-full h-full gap-1">
-                        <span className="text-[10px] absolute -top-1 -right-2 z-10">{staffMember.rankBadge}</span>
                         <Avatar className={cn("h-7 w-7 border-2", staffMember.colorRing)}>
                             <AvatarImage src={staffMember.avatar} />
                             <AvatarFallback className="bg-slate-100 text-[10px] font-bold tracking-tighter text-slate-600">
@@ -173,7 +164,7 @@ export function Staff() {
                             </AvatarFallback>
                         </Avatar>
                         <span className="text-[11px] font-bold text-slate-600 truncate max-w-full tracking-tight">
-                            #{staffMember.rankIndex} {payload.value}
+                            {payload.value}
                         </span>
                     </div>
                 </foreignObject>
@@ -181,15 +172,6 @@ export function Staff() {
         );
     };
 
-    const CustomLineCrownDot = (props: any) => {
-        const { cx, cy } = props;
-
-        return (
-            <g>
-                <circle cx={cx} cy={cy} r={6} stroke="#2563EB" strokeWidth={3} fill="#fff" filter="drop-shadow(0 0 4px rgba(37, 99, 235, 0.4))" />
-            </g>
-        );
-    };
 
 
     const handleAddStaff = () => {
@@ -363,7 +345,7 @@ export function Staff() {
                                     stroke="url(#colorRevenueGrad)"
                                     strokeWidth={5}
                                     filter="url(#shadow)"
-                                    dot={<CustomLineCrownDot />}
+                                    dot={{ r: 6, stroke: '#2563EB', strokeWidth: 3, fill: '#fff' }}
                                     activeDot={{ r: 10, fill: '#4F46E5', stroke: '#fff', strokeWidth: 3, filter: 'drop-shadow(0 0 8px rgba(79, 70, 229, 0.5))' }}
                                 >
                                     <LabelList
@@ -404,8 +386,7 @@ export function Staff() {
                     <Table className="border-separate border-spacing-y-2">
                         <TableHeader className="bg-slate-50/50">
                             <TableRow className="border-none hover:bg-transparent">
-                                <TableHead className="w-[80px] font-black text-[10px] uppercase tracking-widest text-slate-400 pl-8">Rank</TableHead>
-                                <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400">{t('staffCol')}</TableHead>
+                                <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400 pl-8">{t('staffCol')}</TableHead>
                                 <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400">{t('roleCol')}</TableHead>
                                 <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400">{t('contactCol')}</TableHead>
                                 <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400">Leads & Conv</TableHead>
@@ -426,23 +407,10 @@ export function Staff() {
                                 filteredStaffData.map((member) => (
                                     <TableRow
                                         key={member.id}
-                                        className="group bg-white hover:bg-indigo-50/30 transition-all duration-200 border border-slate-100 rounded-xl overflow-hidden shadow-sm shadow-slate-200/50 mb-2"
+                                        className="group bg-white hover:bg-indigo-50/30 transition-all duration-200 border border-slate-100 rounded-xl overflow-hidden shadow-sm shadow-slate-200/50 mb-2 cursor-pointer"
+                                        onClick={() => handleViewProfile(staff.find(s => s.id === member.id)!)}
                                     >
                                         <TableCell className="pl-8">
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn(
-                                                    "flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black border tracking-tighter shadow-sm",
-                                                    member.rankIndex === 1 ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                                        member.rankIndex === 2 ? "bg-slate-50 text-slate-600 border-slate-200" :
-                                                            member.rankIndex === 3 ? "bg-amber-100/50 text-amber-900 border-amber-300/50" :
-                                                                "bg-white text-slate-400 border-slate-100"
-                                                )}>
-                                                    {member.rankIndex}
-                                                </span>
-                                                <span className="text-lg">{member.rankBadge}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
                                             <div className="flex items-center gap-3">
                                                 <Avatar className={cn("h-10 w-10 border-2 shadow-sm transition-transform group-hover:scale-110 duration-300", member.colorRing)}>
                                                     <AvatarImage src={member.avatar} />

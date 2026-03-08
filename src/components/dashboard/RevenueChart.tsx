@@ -11,9 +11,9 @@ export function RevenueChart({ data }: RevenueChartProps) {
     const totalRevenue = data.reduce((sum, item) => sum + item.revenue, 0);
 
     return (
-        <Card className="col-span-3 border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all duration-300 rounded-xl overflow-hidden">
-            <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm font-semibold text-slate-800">Revenue by Package</CardTitle>
+        <Card className="col-span-3 border-none bg-white/70 backdrop-blur-sm shadow-sm hover:shadow-xl transition-all duration-300 rounded-3xl overflow-hidden ring-1 ring-slate-200/50">
+            <CardHeader className="pb-2 pt-6 px-6">
+                <CardTitle className="text-xs font-black text-slate-900 uppercase tracking-widest leading-none">Revenue Distribution</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
                 <div className="h-[180px] w-full relative">

@@ -125,38 +125,38 @@ export function Dashboard() {
 
     return (
         <div className="flex flex-col min-h-full gap-4">
-            <div className="flex-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex-none flex flex-col md:flex-row items-center justify-between gap-4 bg-white/40 backdrop-blur-md p-6 rounded-3xl border border-white/60 shadow-sm shadow-indigo-900/5">
                 <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">{t('dashboard')}</h2>
-                    <p className="text-slate-500 font-medium mt-1">{t('overview')}</p>
+                    <h2 className="text-3xl font-black tracking-tight text-slate-900 uppercase">{t('dashboard')}</h2>
+                    <p className="text-slate-500 font-medium">{t('overview')}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
                     <div
-                        className="relative inline-flex h-9 w-24 items-center justify-between rounded-full bg-slate-100 p-1 cursor-pointer ring-1 ring-inset ring-slate-200 transition-colors mr-1 shrink-0 group"
+                        className="relative inline-flex h-11 min-w-[100px] items-center justify-between rounded-xl bg-white/80 backdrop-blur-sm p-1 cursor-pointer border border-slate-200/60 shadow-sm transition-all hover:border-slate-300 group mr-1 shrink-0"
                         onClick={() => setLanguage(language === 'EN' ? 'FR' : 'EN')}
                         title="Toggle Language"
                     >
-                        <span className={`z-10 w-1/2 text-center text-[11px] font-bold tracking-wider select-none transition-colors duration-300 ${language === 'EN' ? 'text-slate-800' : 'text-slate-400 group-hover:text-slate-600'}`}>EN</span>
-                        <span className={`z-10 w-1/2 text-center text-[11px] font-bold tracking-wider select-none transition-colors duration-300 ${language === 'FR' ? 'text-slate-800' : 'text-slate-400 group-hover:text-slate-600'}`}>FR</span>
-                        <div className={`absolute top-1 h-7 w-[calc(50%-4px)] rounded-full bg-white shadow-sm ring-1 ring-slate-200/50 transition-all duration-300 ease-in-out ${language === 'FR' ? 'left-[calc(50%+2px)]' : 'left-1'}`} />
+                        <span className={`z-10 w-1/2 text-center text-[10px] font-black tracking-widest select-none transition-colors duration-300 ${language === 'EN' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`}>EN</span>
+                        <span className={`z-10 w-1/2 text-center text-[10px] font-black tracking-widest select-none transition-colors duration-300 ${language === 'FR' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`}>FR</span>
+                        <div className={`absolute top-1 h-9 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm border border-slate-100 transition-all duration-300 ease-in-out ${language === 'FR' ? 'left-[calc(50%+2px)]' : 'left-1'}`} />
                     </div>
 
                     <Button
-                        className="bg-[#33A894] hover:bg-[#2c9180] text-white shadow-sm border-none"
+                        className="bg-[#33A894] hover:bg-[#2c9180] text-white h-11 px-6 rounded-xl shadow-md shadow-[#33A894]/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 font-bold shrink-0"
                         onClick={() => setIsLeadModalOpen(true)}
                     >
-                        <Plus className="mr-2 h-4 w-4" /> {t('newLead')}
+                        <Plus className="h-4 w-4" /> {t('newLead')}
                     </Button>
                     <Button
-                        variant="outline"
-                        className="border-slate-200 hover:bg-slate-50 shadow-sm"
+                        variant="ghost"
+                        className="bg-white/80 backdrop-blur-sm border border-slate-200/60 hover:bg-slate-50 h-11 px-6 rounded-xl shadow-sm font-bold text-slate-700 shrink-0"
                         onClick={() => navigate('/tours/new')}
                     >
                         <Plus className="mr-2 h-4 w-4 text-emerald-600" /> {t('newTour')}
                     </Button>
                     <Button
-                        variant="outline"
-                        className="border-slate-200 hover:bg-slate-50 shadow-sm"
+                        variant="ghost"
+                        className="bg-white/80 backdrop-blur-sm border border-slate-200/60 hover:bg-slate-50 h-11 px-6 rounded-xl shadow-sm font-bold text-slate-700 shrink-0"
                     >
                         <Send className="mr-2 h-4 w-4 text-blue-600" /> {t('broadcast')}
                     </Button>
