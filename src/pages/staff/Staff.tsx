@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Search, Plus, Mail, MoreHorizontal, Phone, Users, TrendingUp } from 'lucide-react';
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList, ReferenceLine } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList, ReferenceLine, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
 import {
     Table,
@@ -109,7 +109,7 @@ export function Staff() {
         const bottom = staffSalesData[staffSalesData.length - 1];
 
         if (top.salesRevenue > 0) {
-            return `🏆 ${top.name} is leading with the highest revenue ($${top.salesRevenue.toLocaleString()}) and a ${top.conversionRate}% conversion rate. ${bottom.convertedLeads === 0 ? `${bottom.name} hasn't converted any leads yet.` : ''}`;
+            return `🏆 ${top.name} leads with $${top.salesRevenue.toLocaleString()} revenue and a ${top.conversionRate}% conversion rate. Suggestion: Allocate high-value inbound leads directly to ${top.name} to maximize closing probability. ${bottom.convertedLeads === 0 ? `\n📉 ${bottom.name} has not converted any leads yet.` : ''}`;
         }
         return "No revenue generated yet. Keep tracking conversions!";
     }, [staffSalesData]);
@@ -277,13 +277,30 @@ export function Staff() {
                         </div>
                     </div>
 
-                    <div className="p-4 mb-6 mx-8 bg-blue-50/50 rounded-xl border border-blue-100/50 flex items-start gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg shrink-0">
-                            <TrendingUp className="h-4 w-4 text-blue-600" />
+                    {/* AI Insights & Filtering Header */}
+                    <div className="flex flex-col xl:flex-row gap-4 px-8 mb-6">
+                        <div className="flex-1 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50 flex items-start gap-4 shadow-sm shadow-blue-900/5">
+                            <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shrink-0 shadow-md shadow-blue-500/20">
+                                <span className="text-xl">🤖</span>
+                            </div>
+                            <div className="w-full">
+                                <p className="text-[13px] font-bold text-blue-900 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                                    AI Performance Insight
+                                </p>
+                                <p className="text-sm text-blue-800/90 whitespace-pre-line font-medium leading-relaxed">{insightText}</p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-sm font-semibold text-blue-900 leading-tight">AI Insights</p>
-                            <p className="text-sm text-blue-700/80 mt-0.5">{insightText}</p>
+
+                        {/* Interactive Time Filter Mock UI */}
+                        <div className="shrink-0 flex items-center self-start xl:self-center bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/60">
+                            {['Today', 'This Week', 'This Month', 'Quarter'].map((filter, i) => (
+                                <button key={filter} className={cn(
+                                    "px-4 py-2 text-[13px] font-bold rounded-lg transition-all",
+                                    i === 2 ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                                )}>
+                                    {filter}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -293,29 +310,29 @@ export function Staff() {
                             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Assigned</p>
                             <div className="flex items-end justify-between">
                                 <p className="text-2xl font-black text-slate-900">{summaryKPIs.totalAssigned}</p>
-                                <span className="text-[10px] font-bold text-emerald-600">↑ +12%</span>
+                                <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" /> 12%</span>
                             </div>
                         </div>
-                        <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100/60">
+                        <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100/60 shadow-sm shadow-emerald-900/5">
                             <p className="text-[11px] font-bold text-emerald-600/80 uppercase tracking-widest mb-1">Total Converted</p>
                             <div className="flex items-end justify-between">
                                 <p className="text-2xl font-black text-emerald-700">{summaryKPIs.totalConverted}</p>
-                                <span className="text-[10px] font-bold text-emerald-600">↑ +5%</span>
+                                <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" /> 5%</span>
                             </div>
                         </div>
-                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100/60">
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100/60 shadow-sm shadow-slate-900/5">
                             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Avg Conversion</p>
                             <div className="flex items-end justify-between">
                                 <p className="text-2xl font-black text-slate-900">{summaryKPIs.avgConversion}%</p>
-                                <span className="text-[10px] font-bold text-slate-400">− 0%</span>
+                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-0.5">— 0%</span>
                             </div>
                         </div>
-                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100/60 w-full relative overflow-hidden">
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100/60 w-full relative overflow-hidden shadow-sm shadow-blue-900/5">
                             <div className="relative z-10">
                                 <p className="text-[11px] font-bold text-blue-600/80 uppercase tracking-widest mb-1">Total Revenue</p>
                                 <div className="flex items-end justify-between">
                                     <p className="text-2xl font-black text-blue-700">${summaryKPIs.totalRevenue.toLocaleString()}</p>
-                                    <span className="text-[10px] font-bold text-emerald-600">↑ +18%</span>
+                                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" /> 18%</span>
                                 </div>
                             </div>
                         </div>
@@ -334,11 +351,15 @@ export function Staff() {
                                         <stop offset="0%" stopColor="#f1f5f9" stopOpacity={1} />
                                         <stop offset="100%" stopColor="#e2e8f0" stopOpacity={1} />
                                     </linearGradient>
+                                    <linearGradient id="colorRevenueGrad" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#2563EB" stopOpacity={0.9} />
+                                        <stop offset="100%" stopColor="#60A5FA" stopOpacity={0.9} />
+                                    </linearGradient>
                                     <filter id="shadow" height="200%">
-                                        <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#0ea5e9" floodOpacity="0.25" />
+                                        <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#2563EB" floodOpacity="0.25" />
                                     </filter>
                                 </defs>
-                                <CartesianGrid strokeDasharray="4 4" vertical={true} horizontal={true} stroke="#f1f5f9" strokeOpacity={0.4} />
+                                <CartesianGrid strokeDasharray="4 4" vertical={true} horizontal={true} stroke="#f1f5f9" strokeOpacity={0.3} />
                                 <XAxis
                                     dataKey="name"
                                     axisLine={false}
@@ -388,6 +409,9 @@ export function Staff() {
                                         formatter={(val: any) => val > 0 ? `${val}` : ''}
                                         style={{ fill: '#ffffff', fontSize: '11px', fontWeight: 'bold' }}
                                     />
+                                    {staffSalesData.map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={index === 0 ? "#059669" : "#10B981"} />
+                                    ))}
                                 </Bar>
                                 <Bar yAxisId="left" dataKey="unconvertedLeads" stackId="a" name="Remaining" fill="#E5E7EB" radius={[4, 4, 0, 0]} barSize={40} />
 
@@ -396,10 +420,11 @@ export function Staff() {
                                     name="Revenue"
                                     type="monotone"
                                     dataKey="salesRevenue"
-                                    stroke="#3B82F6"
+                                    stroke="url(#colorRevenueGrad)"
                                     strokeWidth={4}
+                                    filter="url(#shadow)"
                                     dot={<CustomLineCrownDot />}
-                                    activeDot={{ r: 8, strokeWidth: 0, fill: '#3B82F6' }}
+                                    activeDot={{ r: 8, fill: '#2563EB', stroke: '#fff', strokeWidth: 2 }}
                                 >
                                     <LabelList
                                         dataKey="salesRevenue"
@@ -415,7 +440,57 @@ export function Staff() {
                 </CardContent>
             </Card>
 
-            <Card>
+            <Card className="animate-in slide-in-from-bottom-6 duration-500 delay-150">
+                <CardHeader>
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <span className="text-xl">📊</span> {t('leaderboard')}
+                        </CardTitle>
+                        <CardDescription>Track conversion efficiency and final revenue generation at a glance.</CardDescription>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader className="bg-slate-50/80">
+                            <TableRow>
+                                <TableHead className="w-[100px] font-bold text-slate-700">Rank</TableHead>
+                                <TableHead className="font-bold text-slate-700">Staff</TableHead>
+                                <TableHead className="text-center font-bold text-slate-700">Assigned</TableHead>
+                                <TableHead className="text-center font-bold text-emerald-700">Converted</TableHead>
+                                <TableHead className="text-center font-bold text-slate-700">Conversion</TableHead>
+                                <TableHead className="text-right font-bold text-blue-700">Revenue</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {staffSalesData.map((staff) => (
+                                <TableRow key={staff.id} className="group hover:bg-slate-50/50 transition-colors">
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xl">{staff.rankBadge}</span>
+                                            <span className="text-xs font-bold text-slate-400">#{staff.rankIndex}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className={cn("h-8 w-8 border", staff.colorRing, "group-hover:scale-110 transition-transform")}>
+                                                <AvatarImage src={staff.avatar} />
+                                                <AvatarFallback className="text-xs">{staff.name[0]}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="font-bold text-slate-900">{staff.fullName}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center font-bold text-slate-600">{staff.totalLeads}</TableCell>
+                                    <TableCell className="text-center font-bold text-emerald-600">{staff.convertedLeads}</TableCell>
+                                    <TableCell className="text-center font-bold text-slate-900">{staff.conversionRate}%</TableCell>
+                                    <TableCell className="text-right font-black text-blue-600">${staff.salesRevenue.toLocaleString()}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            <Card className="animate-in slide-in-from-bottom-8 duration-500 delay-300">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
@@ -423,10 +498,10 @@ export function Staff() {
                             <CardDescription>{t('teamDesc')}</CardDescription>
                         </div>
                         <div className="relative w-64">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                             <Input
                                 placeholder={t('search')}
-                                className="pl-9"
+                                className="pl-9 bg-slate-50 border-slate-200"
                                 value={searchTerm}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                             />
