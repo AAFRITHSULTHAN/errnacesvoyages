@@ -29,7 +29,7 @@ export function Sidebar() {
         { label: t('tourPackages'), icon: Map, href: '/tours' },
         { label: t('whatsapp'), icon: MessageSquare, href: '/whatsapp' },
         { label: t('analytics'), icon: BarChart3, href: '/analytics' },
-        { label: t('staff'), icon: Users, href: '/staff' },
+        ...(user?.role === 'admin' ? [{ label: t('staff'), icon: Users, href: '/staff' }] : []),
     ];
 
     const NavContent = () => (

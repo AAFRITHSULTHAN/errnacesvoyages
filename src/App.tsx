@@ -33,6 +33,34 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppRoutes() {
+  const { user } = useAuth();
+
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<Dashboard />} />
+        <Route path="pipeline" element={<Pipeline />} />
+        <Route path="leads" element={<Leads />} />
+        <Route path="tours" element={<TourList />} />
+        <Route path="tours/new" element={<TourForm />} />
+        <Route path="tours/:id" element={<TourDetails />} />
+        <Route path="tours/:id/edit" element={<TourForm />} />
+        <Route path="whatsapp" element={<WhatsApp />} />
+        <Route path="analytics" element={<Analytics />} />
+        <Route path="staff" element={
+          user?.role === 'admin' ? <Staff /> : <Navigate to="/" replace />
+        } />
+      </Route>
+    </Routes>
+  );
+}
+
 export default function App() {
   return (
     <I18nProvider>
@@ -40,25 +68,7 @@ export default function App() {
         <AuthProvider>
           <AnalyticsTracker />
           <Toaster />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Dashboard />} />
-              <Route path="pipeline" element={<Pipeline />} />
-              <Route path="leads" element={<Leads />} />
-              <Route path="tours" element={<TourList />} />
-              <Route path="tours/new" element={<TourForm />} />
-              <Route path="tours/:id" element={<TourDetails />} />
-              <Route path="tours/:id/edit" element={<TourForm />} />
-              <Route path="whatsapp" element={<WhatsApp />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="staff" element={<Staff />} />
-            </Route>
-          </Routes>
+          <AppRoutes />
         </AuthProvider>
       </Router>
     </I18nProvider>

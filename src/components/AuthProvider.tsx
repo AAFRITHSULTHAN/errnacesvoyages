@@ -95,8 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const fallbackUser: User = {
                         id: session.user.id,
                         email: session.user.email!,
-                        full_name: session.user.user_metadata.full_name || 'User',
-                        role: 'sales_executive', // Default
+                        full_name: session.user.user_metadata.full_name || 'Admin',
+                        role: session.user.email === 'admin@errancesvoyages.com' ? 'admin' : 'sales_executive',
                         avatar_url: session.user.user_metadata.avatar_url,
                     };
                     setUser(fallbackUser);
