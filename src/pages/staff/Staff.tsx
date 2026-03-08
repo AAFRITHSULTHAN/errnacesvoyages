@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Plus, Mail, MoreHorizontal, Phone, Users } from 'lucide-react';
-import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 import { cn } from '@/lib/utils';
 import {
     Table,
@@ -102,78 +101,6 @@ export function Staff() {
     }, [staffSalesData, t]);
 
 
-
-    const CustomTooltip = ({ active, payload }: any) => {
-        if (active && payload && payload.length) {
-            // Find our staff member manually since Recharts payload splitting for stacked bars makes it tricky
-            const staffName = payload[0].payload.name;
-            const data = staffSalesData.find(s => s.name === staffName) || payload[0].payload;
-
-            return (
-                <div className="bg-white/95 backdrop-blur-sm p-4 border border-slate-200 shadow-2xl rounded-2xl min-w-[240px] animate-in fade-in zoom-in-95 duration-200">
-                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
-                        <Avatar className={cn("h-10 w-10 border-2 shadow-sm", data.colorRing)}>
-                            <AvatarImage src={data.avatar} />
-                            <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-sm">{data.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <p className="font-extrabold text-slate-900 text-base">
-                                {data.fullName}
-                            </p>
-                            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
-                                {formatRole(staff.find(s => s.id === data.id)?.role || 'Member')}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="space-y-2.5">
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-slate-500 font-semibold tracking-tight">Leads Assigned</span>
-                            <span className="font-extrabold text-slate-900">{data.totalLeads}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-emerald-600 font-semibold tracking-tight">Leads Converted</span>
-                            <span className="font-extrabold text-emerald-700">{data.convertedLeads}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-slate-500 font-semibold tracking-tight">Conversion Rate</span>
-                            <span className="font-extrabold text-slate-900">{data.conversionRate}%</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm pt-3 mt-3 border-t-2 border-slate-50">
-                            <span className="text-blue-600 font-extrabold tracking-tight">Sales Revenue</span>
-                            <span className="font-black text-blue-700 text-lg">${data.salesRevenue.toLocaleString()}</span>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        return null;
-    };
-
-    const CustomXAxisTick = ({ x, y, payload }: any) => {
-        const staffMember = staffSalesData.find(s => s.name === payload.value);
-        if (!staffMember) return null;
-
-        return (
-            <g transform={`translate(${x},${y})`}>
-                <foreignObject x="-30" y="8" width="60" height="50">
-                    <div className="flex flex-col items-center justify-center w-full h-full gap-1">
-                        <Avatar className={cn("h-7 w-7 border-2", staffMember.colorRing)}>
-                            <AvatarImage src={staffMember.avatar} />
-                            <AvatarFallback className="bg-slate-100 text-[10px] font-bold tracking-tighter text-slate-600">
-                                {staffMember.name[0]}
-                            </AvatarFallback>
-                        </Avatar>
-                        <span className="text-[11px] font-bold text-slate-600 truncate max-w-full tracking-tight">
-                            {payload.value}
-                        </span>
-                    </div>
-                </foreignObject>
-            </g>
-        );
-    };
-
-
-
     const handleAddStaff = () => {
         setSelectedStaff(undefined);
         setIsDialogOpen(true);
@@ -258,109 +185,6 @@ export function Staff() {
             </div>
 
             <KPICards kpis={summaryKPIs.kpis} />
-
-            <Card className="border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom-4 duration-500 bg-white rounded-2xl">
-                <CardHeader className="bg-white border-b border-slate-100 pb-0 px-8 pt-8 relative overflow-hidden">
-                    <div className="flex justify-between items-start relative z-10 mb-6">
-                        <div>
-                            <CardTitle className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
-                                {t('staffSalesPerf')}
-                            </CardTitle>
-                            <CardDescription className="mt-1.5 text-slate-500/90 text-sm font-medium">
-                                Track assigned leads against conversions and generated revenue per staff member.
-                            </CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="pt-6 px-6 pb-6">
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={staffSalesData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }} barGap={6}>
-                                <defs>
-                                    <linearGradient id="colorConverted" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#10B981" stopOpacity={1} />
-                                        <stop offset="100%" stopColor="#047857" stopOpacity={1} />
-                                    </linearGradient>
-                                    <linearGradient id="colorRemaining" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#F1F5F9" stopOpacity={1} />
-                                        <stop offset="100%" stopColor="#CBD5E1" stopOpacity={1} />
-                                    </linearGradient>
-                                    <linearGradient id="colorRevenueGrad" x1="0" y1="0" x2="1" y2="1">
-                                        <stop offset="0%" stopColor="#0EA5E9" stopOpacity={1} />
-                                        <stop offset="100%" stopColor="#4F46E5" stopOpacity={1} />
-                                    </linearGradient>
-                                    <filter id="shadow" height="200%">
-                                        <feDropShadow dx="0" dy="8" stdDeviation="12" floodColor="#4F46E5" floodOpacity="0.3" />
-                                    </filter>
-                                </defs>
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={<CustomXAxisTick />}
-                                    height={70}
-                                    dy={5}
-                                />
-                                <YAxis
-                                    yAxisId="left"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
-                                    dx={-10}
-                                />
-                                <YAxis
-                                    yAxisId="right"
-                                    orientation="right"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#6366F1', fontSize: 13, fontWeight: 800 }}
-                                    tickFormatter={(v) => v >= 1000 ? `$${(v / 1000).toFixed(1).replace(/\.0$/, '')}k` : `$${v}`}
-                                    dx={10}
-                                />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc', opacity: 0.8 }} />
-
-                                <Legend
-                                    verticalAlign="top"
-                                    align="right"
-                                    wrapperStyle={{ paddingBottom: '30px', fontSize: '13px', fontWeight: 700, color: '#475569' }}
-                                    iconType="circle"
-                                />
-
-                                {/* True Stacked Bars (Converted + Unconverted = Total) */}
-                                <Bar yAxisId="left" dataKey="convertedLeads" stackId="a" name="Converted" fill="url(#colorConverted)" radius={[0, 0, 4, 4]} barSize={56}>
-                                    <LabelList
-                                        dataKey="convertedLeads"
-                                        position="center"
-                                        formatter={(val: any) => val > 0 ? `${val}` : ''}
-                                        style={{ fill: '#ffffff', fontSize: '14px', fontWeight: 900, textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}
-                                    />
-                                </Bar>
-                                <Bar yAxisId="left" dataKey="unconvertedLeads" stackId="a" name="Remaining" fill="url(#colorRemaining)" radius={[4, 4, 0, 0]} barSize={56} />
-
-                                <Line
-                                    yAxisId="right"
-                                    name="Revenue"
-                                    type="monotone"
-                                    dataKey="salesRevenue"
-                                    stroke="url(#colorRevenueGrad)"
-                                    strokeWidth={5}
-                                    filter="url(#shadow)"
-                                    dot={{ r: 6, stroke: '#2563EB', strokeWidth: 3, fill: '#fff' }}
-                                    activeDot={{ r: 10, fill: '#4F46E5', stroke: '#fff', strokeWidth: 3, filter: 'drop-shadow(0 0 8px rgba(79, 70, 229, 0.5))' }}
-                                >
-                                    <LabelList
-                                        dataKey="salesRevenue"
-                                        position="top"
-                                        offset={18}
-                                        formatter={(val: any) => Number(val) > 0 ? `$${val.toLocaleString()}` : ''}
-                                        style={{ fill: '#4F46E5', fontSize: '13px', fontWeight: 900, filter: 'drop-shadow(0 1px 2px rgba(255,255,255,0.8))' }}
-                                    />
-                                </Line>
-                            </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
-                </CardContent>
-            </Card>
 
 
 
