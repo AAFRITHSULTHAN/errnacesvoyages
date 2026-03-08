@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Search, Plus, Mail, MoreHorizontal, Phone, TrendingUp, Users } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { cn } from '@/lib/utils';
 import {
     Table,
@@ -67,7 +67,6 @@ export function Staff() {
         }).sort((a, b) => b.totalLeads - a.totalLeads);
     }, [staff, leads]);
 
-    const COLORS = ['#33A894', '#2c9180', '#257d6e', '#1f695c', '#18564a'];
 
     const handleAddStaff = () => {
         setSelectedStaff(undefined);
@@ -136,42 +135,103 @@ export function Staff() {
                 </Button>
             </div>
 
-            <Card className="border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
-                    <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-[#33A894]" />
-                        {t('staffSalesPerf')}
-                    </CardTitle>
-                    <CardDescription>{t('revenueDesc')}</CardDescription>
+            <Card className="border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom-4 duration-500 bg-white rounded-2xl">
+                <CardHeader className="bg-white border-b border-slate-100/80 pb-6 px-8 pt-8 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#33A894] to-[#257d6e]"></div>
+                    <div className="flex justify-between items-start relative z-10">
+                        <div>
+                            <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+                                <div className="p-2.5 bg-[#33A894]/10 rounded-xl">
+                                    <TrendingUp className="h-6 w-6 text-[#33A894]" />
+                                </div>
+                                {t('staffSalesPerf')}
+                            </CardTitle>
+                            <CardDescription className="mt-3 text-slate-500/90 text-sm ml-14 font-medium">
+                                {t('revenueDesc')}
+                            </CardDescription>
+                        </div>
+                    </div>
                 </CardHeader>
-                <CardContent className="pt-6">
-                    <div className="h-[320px] w-full">
+                <CardContent className="pt-8 px-6 pb-8">
+                    <div className="h-[360px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={staffSalesData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
-                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} tickFormatter={(v) => `$${v}`} />
+                            <ComposedChart data={staffSalesData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }} barGap={6}>
+                                <defs>
+                                    <linearGradient id="colorConverted" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#33A894" stopOpacity={1} />
+                                        <stop offset="100%" stopColor="#257d6e" stopOpacity={1} />
+                                    </linearGradient>
+                                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#f1f5f9" stopOpacity={1} />
+                                        <stop offset="100%" stopColor="#e2e8f0" stopOpacity={1} />
+                                    </linearGradient>
+                                    <filter id="shadow" height="200%">
+                                        <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#0ea5e9" floodOpacity="0.25" />
+                                    </filter>
+                                </defs>
+                                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f8fafc" />
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#64748b', fontSize: 13, fontWeight: 600 }}
+                                    dy={16}
+                                />
+                                <YAxis
+                                    yAxisId="left"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                                    dx={-10}
+                                />
+                                <YAxis
+                                    yAxisId="right"
+                                    orientation="right"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#0ea5e9', fontSize: 12, fontWeight: 700 }}
+                                    tickFormatter={(v) => `$${v.toLocaleString()}`}
+                                    dx={10}
+                                />
                                 <Tooltip
-                                    cursor={{ fill: 'rgba(51, 168, 148, 0.05)' }}
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}
+                                    cursor={{ fill: '#f8fafc', opacity: 0.6 }}
+                                    contentStyle={{
+                                        borderRadius: '12px',
+                                        border: '1px solid rgba(226, 232, 240, 0.9)',
+                                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03)',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                                        backdropFilter: 'blur(12px)',
+                                        padding: '14px 18px'
+                                    }}
+                                    itemStyle={{ fontSize: '13px', fontWeight: 600, paddingBottom: '4px' }}
+                                    labelStyle={{ color: '#0f172a', fontWeight: '700', marginBottom: '10px', fontSize: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}
                                     formatter={(value: any, name: any) => [
                                         name === 'salesRevenue' ? `$${(value || 0).toLocaleString()}` : value,
-                                        name === 'salesRevenue' ? 'Revenue (Converted)' : name === 'totalLeads' ? 'Total Assigned' : 'Converted'
+                                        name === 'salesRevenue' ? 'Revenue (Converted)' : name === 'totalLeads' ? 'Total Assigned' : 'Converted Leads'
                                     ]}
-                                    labelStyle={{ color: '#0f172a', fontWeight: 'bold', marginBottom: '4px' }}
                                 />
-                                <Legend formatter={(value) =>
-                                    value === 'totalLeads' ? 'Total Assigned Leads' :
-                                        value === 'convertedLeads' ? 'Converted' : 'Revenue'
-                                } />
-                                <Bar yAxisId="left" dataKey="totalLeads" radius={[6, 6, 0, 0]} barSize={28} fill="#94a3b8" />
-                                <Bar yAxisId="left" dataKey="convertedLeads" radius={[6, 6, 0, 0]} barSize={28}>
-                                    {staffSalesData.map((_entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length] || '#33A894'} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
+                                <Legend
+                                    wrapperStyle={{ paddingTop: '28px', fontSize: '13px', fontWeight: 600, color: '#64748b' }}
+                                    formatter={(value) =>
+                                        value === 'totalLeads' ? 'Total Assigned' :
+                                            value === 'convertedLeads' ? 'Converted Leads' : 'Revenue ($)'
+                                    }
+                                    iconType="circle"
+                                />
+                                <Bar yAxisId="left" dataKey="totalLeads" radius={[6, 6, 0, 0]} barSize={32} maxBarSize={48} fill="url(#colorTotal)" />
+                                <Bar yAxisId="left" dataKey="convertedLeads" radius={[6, 6, 0, 0]} barSize={32} maxBarSize={48} fill="url(#colorConverted)" />
+                                <Line
+                                    yAxisId="right"
+                                    type="monotone"
+                                    dataKey="salesRevenue"
+                                    stroke="#0ea5e9"
+                                    strokeWidth={4}
+                                    dot={{ r: 6, strokeWidth: 3, fill: '#fff', stroke: '#0ea5e9' }}
+                                    activeDot={{ r: 8, strokeWidth: 0, fill: '#0ea5e9' }}
+
+                                    filter="url(#shadow)"
+                                />
+                            </ComposedChart>
                         </ResponsiveContainer>
                     </div>
                 </CardContent>
