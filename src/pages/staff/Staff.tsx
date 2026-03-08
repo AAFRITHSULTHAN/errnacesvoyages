@@ -235,7 +235,7 @@ export function Staff() {
         <div className="space-y-6 animate-in fade-in duration-500 pb-8">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/40 backdrop-blur-md p-6 rounded-3xl border border-white/60 shadow-sm shadow-indigo-900/5">
                 <div>
-                    <h2 className="text-3xl font-black tracking-tight text-slate-900 uppercase">{t('staffMgmt')}</h2>
+                    <h2 className="text-2xl font-black tracking-tight text-slate-900 uppercase">{t('staffMgmt')}</h2>
                     <p className="text-slate-500 font-medium">{t('staffDesc')}</p>
                 </div>
                 <div className="flex items-center gap-3 w-full md:w-auto">
@@ -263,7 +263,7 @@ export function Staff() {
                 <CardHeader className="bg-white border-b border-slate-100 pb-0 px-8 pt-8 relative overflow-hidden">
                     <div className="flex justify-between items-start relative z-10 mb-6">
                         <div>
-                            <CardTitle className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+                            <CardTitle className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
                                 {t('staffSalesPerf')}
                             </CardTitle>
                             <CardDescription className="mt-1.5 text-slate-500/90 text-sm font-medium">
