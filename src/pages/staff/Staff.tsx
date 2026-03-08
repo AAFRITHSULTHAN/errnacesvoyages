@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Mail, MoreHorizontal, Phone, TrendingUp, Users } from 'lucide-react';
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Search, Plus, Mail, MoreHorizontal, Phone, Users } from 'lucide-react';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList, ReferenceLine } from 'recharts';
 import { cn } from '@/lib/utils';
 import {
     Table,
@@ -51,21 +51,115 @@ export function Staff() {
         fetchLeads();
     }, [fetchStaff, fetchLeads]);
 
-    // Calculate staff sales data — includes ALL assigned leads, not just converted
+    // Calculate staff sales data & sort top performers SaaS style
     const staffSalesData = useMemo(() => {
         return staff.map(member => {
             const allAssigned = leads.filter(l => l.assigned_staff_id === member.id);
             const convertedLeads = allAssigned.filter(l => l.status === 'converted');
             const salesRevenue = convertedLeads.reduce((sum, l) => sum + (l.budget || 0), 0);
+            const conversionRate = allAssigned.length > 0
+                ? Math.round((convertedLeads.length / allAssigned.length) * 100)
+                : 0;
+
             return {
+                id: member.id,
                 name: member.full_name.split(' ')[0],
                 fullName: member.full_name,
+                avatar: member.avatar_url,
                 totalLeads: allAssigned.length,
                 convertedLeads: convertedLeads.length,
+                conversionRate,
                 salesRevenue,
             };
-        }).sort((a, b) => b.totalLeads - a.totalLeads);
+        }).sort((a, b) => {
+            // Sort by revenue first, then conversion rate
+            if (b.salesRevenue !== a.salesRevenue) return b.salesRevenue - a.salesRevenue;
+            return b.conversionRate - a.conversionRate;
+        });
     }, [staff, leads]);
+
+    // Calculate aggregated KPIs for Summary Cards
+    const summaryKPIs = useMemo(() => {
+        const totalAssigned = staffSalesData.reduce((sum, s) => sum + s.totalLeads, 0);
+        const totalConverted = staffSalesData.reduce((sum, s) => sum + s.convertedLeads, 0);
+        const totalRevenue = staffSalesData.reduce((sum, s) => sum + s.salesRevenue, 0);
+        const avgConversion = totalAssigned > 0 ? Math.round((totalConverted / totalAssigned) * 100) : 0;
+        const targetRevenue = staffSalesData.length > 0 ? Math.round(totalRevenue / staffSalesData.length) : 0;
+
+        return { totalAssigned, totalConverted, avgConversion, totalRevenue, targetRevenue };
+    }, [staffSalesData]);
+
+    const CustomTooltip = ({ active, payload }: any) => {
+        if (active && payload && payload.length) {
+            const data = payload[0].payload;
+            return (
+                <div className="bg-white p-4 border border-slate-200 shadow-xl rounded-xl min-w-[200px]">
+                    <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100">
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={data.avatar} />
+                            <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-xs">{data.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-bold text-slate-900 text-sm">{data.fullName}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                {data.salesRevenue >= summaryKPIs.targetRevenue ? '🟢 Top Performer' : '🔴 Needs Attention'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-500 font-medium tracking-tight">Assigned Leads</span>
+                            <span className="font-bold text-slate-900">{data.totalLeads}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-emerald-600 font-medium tracking-tight">Converted Leads</span>
+                            <span className="font-bold text-emerald-700">{data.convertedLeads}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-500 font-medium tracking-tight">Conversion Rate</span>
+                            <span className="font-bold text-slate-900">{data.conversionRate}%</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm pt-2 mt-2 border-t border-slate-100">
+                            <span className="text-blue-600 font-bold tracking-tight">Total Revenue</span>
+                            <span className="font-black text-blue-700">${data.salesRevenue.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    const CustomXAxisTick = ({ x, y, payload }: any) => {
+        const staffMember = staffSalesData.find(s => s.name === payload.value);
+        if (!staffMember) return null;
+
+        const isTop = staffMember.salesRevenue >= summaryKPIs.targetRevenue;
+
+        return (
+            <g transform={`translate(${x},${y})`}>
+                <foreignObject x="-30" y="8" width="60" height="40">
+                    <div className="flex flex-col items-center justify-center w-full h-full gap-1">
+                        <div className="relative">
+                            <Avatar className="h-6 w-6 border border-slate-200">
+                                <AvatarImage src={staffMember.avatar} />
+                                <AvatarFallback className="bg-slate-100 text-[10px] font-bold tracking-tighter text-slate-600">
+                                    {staffMember.name[0]}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className={cn(
+                                "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white",
+                                isTop ? "bg-emerald-500" : "bg-rose-500"
+                            )}></div>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-600 truncate max-w-full tracking-tight">
+                            {payload.value}
+                        </span>
+                    </div>
+                </foreignObject>
+            </g>
+        );
+    };
 
 
     const handleAddStaff = () => {
@@ -136,19 +230,37 @@ export function Staff() {
             </div>
 
             <Card className="border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom-4 duration-500 bg-white rounded-2xl">
-                <CardHeader className="bg-white border-b border-slate-100/80 pb-6 px-8 pt-8 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#33A894] to-[#257d6e]"></div>
-                    <div className="flex justify-between items-start relative z-10">
+                <CardHeader className="bg-white border-b border-slate-100 pb-0 px-8 pt-8 relative overflow-hidden">
+                    <div className="flex justify-between items-start relative z-10 mb-6">
                         <div>
-                            <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-                                <div className="p-2.5 bg-[#33A894]/10 rounded-xl">
-                                    <TrendingUp className="h-6 w-6 text-[#33A894]" />
-                                </div>
+                            <CardTitle className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
                                 {t('staffSalesPerf')}
                             </CardTitle>
-                            <CardDescription className="mt-3 text-slate-500/90 text-sm ml-14 font-medium">
-                                {t('revenueDesc')}
+                            <CardDescription className="mt-1.5 text-slate-500/90 text-sm font-medium">
+                                Track assigned leads against conversions and generated revenue.
                             </CardDescription>
+                        </div>
+                    </div>
+
+                    {/* KPI Summary Cards */}
+                    <div className="grid grid-cols-4 gap-4 mb-6">
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100/60">
+                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Assigned</p>
+                            <p className="text-2xl font-black text-slate-900">{summaryKPIs.totalAssigned}</p>
+                        </div>
+                        <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100/60">
+                            <p className="text-[11px] font-bold text-emerald-600/80 uppercase tracking-widest mb-1">Converted</p>
+                            <p className="text-2xl font-black text-emerald-700">{summaryKPIs.totalConverted}</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100/60">
+                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Conversion</p>
+                            <p className="text-2xl font-black text-slate-900">{summaryKPIs.avgConversion}%</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100/60 w-full relative overflow-hidden">
+                            <div className="relative z-10">
+                                <p className="text-[11px] font-bold text-blue-600/80 uppercase tracking-widest mb-1">Total Revenue</p>
+                                <p className="text-2xl font-black text-blue-700">${summaryKPIs.totalRevenue.toLocaleString()}</p>
+                            </div>
                         </div>
                     </div>
                 </CardHeader>
@@ -174,8 +286,9 @@ export function Staff() {
                                     dataKey="name"
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fill: '#64748b', fontSize: 13, fontWeight: 600 }}
-                                    dy={16}
+                                    tick={<CustomXAxisTick />}
+                                    height={60}
+                                    dy={5}
                                 />
                                 <YAxis
                                     yAxisId="left"
@@ -193,44 +306,54 @@ export function Staff() {
                                     tickFormatter={(v) => `$${v.toLocaleString()}`}
                                     dx={10}
                                 />
-                                <Tooltip
-                                    cursor={{ fill: '#f8fafc', opacity: 0.6 }}
-                                    contentStyle={{
-                                        borderRadius: '12px',
-                                        border: '1px solid rgba(226, 232, 240, 0.9)',
-                                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03)',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                        backdropFilter: 'blur(12px)',
-                                        padding: '14px 18px'
-                                    }}
-                                    itemStyle={{ fontSize: '13px', fontWeight: 600, paddingBottom: '4px' }}
-                                    labelStyle={{ color: '#0f172a', fontWeight: '700', marginBottom: '10px', fontSize: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}
-                                    formatter={(value: any, name: any) => [
-                                        name === 'salesRevenue' ? `$${(value || 0).toLocaleString()}` : value,
-                                        name === 'salesRevenue' ? 'Revenue (Converted)' : name === 'totalLeads' ? 'Total Assigned' : 'Converted Leads'
-                                    ]}
-                                />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F3F4F6' }} />
+
                                 <Legend
-                                    wrapperStyle={{ paddingTop: '28px', fontSize: '13px', fontWeight: 600, color: '#64748b' }}
-                                    formatter={(value) =>
-                                        value === 'totalLeads' ? 'Total Assigned' :
-                                            value === 'convertedLeads' ? 'Converted Leads' : 'Revenue ($)'
-                                    }
+                                    wrapperStyle={{ paddingTop: '10px', fontSize: '12px', fontWeight: 600, color: '#64748b' }}
                                     iconType="circle"
                                 />
-                                <Bar yAxisId="left" dataKey="totalLeads" radius={[6, 6, 0, 0]} barSize={32} maxBarSize={48} fill="url(#colorTotal)" />
-                                <Bar yAxisId="left" dataKey="convertedLeads" radius={[6, 6, 0, 0]} barSize={32} maxBarSize={48} fill="url(#colorConverted)" />
+
+                                {summaryKPIs.targetRevenue > 0 && (
+                                    <ReferenceLine
+                                        y={summaryKPIs.targetRevenue}
+                                        yAxisId="right"
+                                        stroke="#94A3B8"
+                                        strokeDasharray="4 4"
+                                        label={{ position: 'top', value: `Goal avg: $${summaryKPIs.targetRevenue.toLocaleString()}`, fill: '#94A3B8', fontSize: 11, fontWeight: 'bold' }}
+                                    />
+                                )}
+
+                                {/* Background Track (Total Leads) */}
+                                <Bar yAxisId="left" dataKey="totalLeads" name="Assigned" fill="#E5E7EB" radius={[4, 4, 0, 0]} barSize={40} />
+
+                                {/* Foreground Track (Converted Leads, overlapping) */}
+                                <Bar yAxisId="left" dataKey="convertedLeads" name="Converted" fill="#10B981" radius={[4, 4, 0, 0]} barSize={40} style={{ transform: "translate(-40px, 0)" }}>
+                                    <LabelList
+                                        dataKey="conversionRate"
+                                        position="top"
+                                        formatter={(val: any) => Number(val) > 0 ? `${val}%` : ''}
+                                        style={{ fill: '#10B981', fontSize: '11px', fontWeight: 'bold' }}
+                                    />
+                                </Bar>
+
                                 <Line
                                     yAxisId="right"
+                                    name="Revenue"
                                     type="monotone"
                                     dataKey="salesRevenue"
-                                    stroke="#0ea5e9"
-                                    strokeWidth={4}
-                                    dot={{ r: 6, strokeWidth: 3, fill: '#fff', stroke: '#0ea5e9' }}
-                                    activeDot={{ r: 8, strokeWidth: 0, fill: '#0ea5e9' }}
-
-                                    filter="url(#shadow)"
-                                />
+                                    stroke="#3B82F6"
+                                    strokeWidth={3}
+                                    dot={{ r: 5, strokeWidth: 2, fill: '#fff', stroke: '#3B82F6' }}
+                                    activeDot={{ r: 7, strokeWidth: 0, fill: '#3B82F6' }}
+                                >
+                                    <LabelList
+                                        dataKey="salesRevenue"
+                                        position="top"
+                                        offset={12}
+                                        formatter={(val: any) => Number(val) > 0 ? `$${val}` : ''}
+                                        style={{ fill: '#3B82F6', fontSize: '11px', fontWeight: 'bold' }}
+                                    />
+                                </Line>
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>
