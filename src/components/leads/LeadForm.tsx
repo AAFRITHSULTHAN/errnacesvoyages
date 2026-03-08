@@ -94,7 +94,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
 
     const handleSubmit = (values: LeadFormValues) => {
         const payload = { ...values };
-        if (payload.assigned_staff_id === 'unassigned') {
+        if (!payload.assigned_staff_id || payload.assigned_staff_id === 'unassigned' || payload.assigned_staff_id === '') {
             payload.assigned_staff_id = undefined;
         }
         onSubmit(payload);

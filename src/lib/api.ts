@@ -147,11 +147,10 @@ export async function getStaff() {
 }
 
 export async function createStaff(user: any, _password?: string) {
-    // Insert directly into staffs table without creating an Auth user.
-    // This avoids Supabase email rate limits entirely.
-    // The staff profile for lead assignment is then synced separately.
-    const staffId = user.id || crypto.randomUUID();
+    console.log('API: createStaff (Simplified) initiated for', user.email);
+    const staffId = (user.id || crypto.randomUUID()) as any;
 
+    // Direct database insertion only - bypassing Supabase Auth
     const { data: staffData, error: staffError } = await supabase
         .from('staffs')
         .insert([{
@@ -169,22 +168,43 @@ export async function createStaff(user: any, _password?: string) {
 
     if (staffError) throw staffError;
 
-    // Also try to insert into profiles table so that lead assignment foreign key works.
-    // This may fail silently if RLS blocks it — that's OK, it's best-effort.
+    // Sync to profiles table for lead assignments
     try {
-        await supabase.from('profiles').insert([{
+        await supabase.from('profiles').upsert([{
             id: staffId,
             full_name: user.full_name,
             email: user.email,
             role: user.role,
         }]);
     } catch (_) {
-        // RLS may block this insert; non-fatal
     }
 
-    return staffData;
+    return { data: staffData };
 }
 
+export async function verifyStaffCredentials(email: string, password: string) {
+    console.log('API: verifyStaffCredentials for', email);
+
+    // Sanitize input password (digits only)
+    const sanitizedPassword = password.replace(/\D/g, '');
+
+    const { data, error } = await supabase
+        .from('staffs')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+    if (error || !data) return null;
+
+    // Check if phone matches (also sanitized)
+    const storedPassword = (data.phone || '').replace(/\D/g, '');
+
+    if (sanitizedPassword === storedPassword && storedPassword !== '') {
+        return data;
+    }
+
+    return null;
+}
 
 export async function updateStaff(id: string, updates: any) {
     const { data, error } = await supabase

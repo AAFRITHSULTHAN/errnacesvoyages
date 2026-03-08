@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@/types';
 import { useAppStore } from '@/store';
 import { supabase } from '@/lib/supabase';
+import { verifyStaffCredentials } from '@/lib/api';
 
 interface AuthContextType {
     user: User | null;
@@ -36,7 +37,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (error) throw error;
                 if (mounted) await handleUserSession(session);
             } catch (error) {
-                console.warn('Auth initialization skipped/failed:', error);
+                console.warn('Auth initialization session check failed:', error);
+
+                // Fallback: Check for custom staff session
+                const staffSessionStr = localStorage.getItem('staff_session');
+                if (staffSessionStr && mounted) {
+                    try {
+                        const profile = JSON.parse(staffSessionStr);
+                        setUser(profile as User);
+                        console.log('Restored custom staff session:', profile.email);
+                    } catch (_) {
+                        localStorage.removeItem('staff_session');
+                    }
+                }
             } finally {
                 if (mounted) setLoading(false);
             }
@@ -99,11 +112,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signIn = async (email: string, password?: string) => {
         if (password) {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-            if (error) throw error;
+            try {
+                const { error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+                if (error) throw error;
+            } catch (authError: any) {
+                // If standard login fails, try custom staff verification
+                console.log('Supabase login failed, trying custom staff auth...');
+                const staffProfile = await verifyStaffCredentials(email, password);
+
+                if (staffProfile) {
+                    // Success! Store in AppStore and LocalStorage
+                    setUser(staffProfile as User);
+                    localStorage.setItem('staff_session', JSON.stringify(staffProfile));
+                    console.log('Custom staff login success:', email);
+                } else {
+                    // Both failed
+                    throw authError;
+                }
+            }
         } else {
             const { error } = await supabase.auth.signInWithOtp({
                 email,
@@ -129,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Signout failed unexpectedly:', err);
         } finally {
             console.log('AuthProvider: clearing user state');
+            localStorage.removeItem('staff_session');
             setUser(null);
         }
     };

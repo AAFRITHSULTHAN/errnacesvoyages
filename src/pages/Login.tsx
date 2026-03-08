@@ -17,10 +17,29 @@ export function Login() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            // Try initial sign in
             await signIn(email, password);
             navigate('/');
         } catch (error: any) {
-            toast.error(error.message || 'Error signing in');
+            // If it's a staff member, they might have a sanitized phone number as password
+            // Try signing in with digits-only version if the first one fails
+            const sanitizedPassword = password.replace(/\D/g, '');
+            if (sanitizedPassword && sanitizedPassword !== password) {
+                try {
+                    await signIn(email, sanitizedPassword);
+                    navigate('/');
+                    return;
+                } catch (_) {
+                    // Ignore second error and throw the original one or a combined one
+                }
+            }
+
+            const message = error.message?.toLowerCase() || '';
+            if (message.includes('confirm') || message.includes('verify')) {
+                toast.error('Account not yet confirmed. Please check your email for a verification link.');
+            } else {
+                toast.error(error.message || 'Invalid login credentials');
+            }
         }
     };
 

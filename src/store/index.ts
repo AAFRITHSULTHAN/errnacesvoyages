@@ -58,15 +58,52 @@ export const useAppStore = create<AppState>((set, get) => ({
     addLead: async (lead) => {
         set({ isLoading: true });
         try {
+            // If assigning a staff member, first ensure they have a profile entry
+            if (lead.assigned_staff_id) {
+                const staffMember = get().staff.find(s => s.id === lead.assigned_staff_id);
+                if (staffMember) {
+                    try {
+                        await supabase.from('profiles').upsert([{
+                            id: staffMember.id,
+                            full_name: staffMember.full_name,
+                            email: staffMember.email,
+                            role: staffMember.role,
+                        }], { onConflict: 'id' });
+                    } catch (_) {
+                        // Best-effort sync
+                    }
+                }
+            }
+
             const newLead = await api.createLead(lead);
             set((state) => ({
                 leads: [newLead, ...state.leads],
                 isLoading: false
             }));
             toast.success('Lead added successfully');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to add lead:', error);
-            toast.error(`Failed to add lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+            // Handle FK error for assigned_staff_id
+            const isFkError = error?.code === '23503' ||
+                (error?.message && error.message.includes('foreign key'));
+
+            if (isFkError && lead.assigned_staff_id) {
+                const { assigned_staff_id: _removed, ...leadWithoutStaff } = lead;
+                try {
+                    const newLead = await api.createLead(leadWithoutStaff);
+                    set((state) => ({
+                        leads: [newLead, ...state.leads],
+                        isLoading: false
+                    }));
+                    toast.success('Lead added (staff assignment skipped — staff not yet synced)');
+                    return;
+                } catch (innerError) {
+                    toast.error(`Failed to add lead: ${innerError instanceof Error ? innerError.message : 'Unknown error'}`);
+                }
+            } else {
+                toast.error(`Failed to add lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
             set({ isLoading: false });
         }
     },
@@ -202,11 +239,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     addStaff: async (user, password) => {
         set({ isLoading: true });
         try {
-            const newStaff = await api.createStaff(user, password);
+            const { data: newStaff } = await api.createStaff(user, password);
+
             set((state) => ({
                 staff: [newStaff, ...state.staff],
                 isLoading: false
             }));
+
             toast.success('Staff member added successfully');
         } catch (error) {
             console.error('Failed to add staff:', error);
