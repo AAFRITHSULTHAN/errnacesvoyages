@@ -10,6 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Phone, Calendar, DollarSign, Award, TrendingUp } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { useMemo } from 'react';
+import { useAppStore } from '@/store';
+import { format, subMonths, parseISO } from 'date-fns';
 
 interface StaffProfileProps {
     staff: any;
@@ -17,16 +20,44 @@ interface StaffProfileProps {
     onOpenChange: (open: boolean) => void;
 }
 
-const PERFORMANCE_DATA = [
-    { name: 'Jan', sales: 4000 },
-    { name: 'Feb', sales: 3000 },
-    { name: 'Mar', sales: 2000 },
-    { name: 'Apr', sales: 2780 },
-    { name: 'May', sales: 1890 },
-    { name: 'Jun', sales: 2390 },
-];
-
 export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
+    const leads = useAppStore(state => state.leads);
+
+    const stats = useMemo(() => {
+        if (!staff) return { dealsClosed: 0, totalRevenue: 0, conversion: 0, performanceData: [], recentActivity: [] };
+
+        const staffLeads = leads.filter(l => l.assigned_staff_id === staff.id);
+        const totalLeads = staffLeads.length;
+        const convertedLeads = staffLeads.filter(l => l.status === 'converted');
+
+        const dealsClosed = convertedLeads.length;
+        const totalRevenue = convertedLeads.reduce((sum, l) => sum + (l.budget || 0), 0);
+        const conversion = totalLeads > 0 ? Math.round((dealsClosed / totalLeads) * 100) : 0;
+
+        // Last 6 months performance
+        const performanceData = [];
+        for (let i = 5; i >= 0; i--) {
+            const date = subMonths(new Date(), i);
+            const monthName = format(date, 'MMM');
+
+            const monthSales = convertedLeads
+                .filter(l => {
+                    if (!l.created_at) return false;
+                    const ldate = parseISO(l.created_at);
+                    return ldate.getMonth() === date.getMonth() && ldate.getFullYear() === date.getFullYear();
+                })
+                .reduce((sum, l) => sum + (l.budget || 0), 0);
+
+            performanceData.push({ name: monthName, sales: monthSales });
+        }
+
+        const recentActivity = [...staffLeads]
+            .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+            .slice(0, 5);
+
+        return { dealsClosed, totalRevenue, conversion, performanceData, recentActivity };
+    }, [staff, leads]);
+
     if (!staff) return null;
 
     return (
@@ -75,21 +106,21 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
                         <Card>
                             <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                                 <Award className="h-5 w-5 text-blue-500 mb-2" />
-                                <div className="text-2xl font-bold">12</div>
+                                <div className="text-2xl font-bold">{stats.dealsClosed}</div>
                                 <div className="text-xs text-muted-foreground">Deals Closed</div>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                                 <DollarSign className="h-5 w-5 text-green-500 mb-2" />
-                                <div className="text-2xl font-bold">$45k</div>
+                                <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
                                 <div className="text-xs text-muted-foreground">Total Revenue</div>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                                 <TrendingUp className="h-5 w-5 text-purple-500 mb-2" />
-                                <div className="text-2xl font-bold">85%</div>
+                                <div className="text-2xl font-bold">{stats.conversion}%</div>
                                 <div className="text-xs text-muted-foreground">Conversion</div>
                             </CardContent>
                         </Card>
@@ -103,7 +134,7 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
                         <CardContent>
                             <div className="h-[200px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={PERFORMANCE_DATA}>
+                                    <BarChart data={stats.performanceData}>
                                         <XAxis
                                             dataKey="name"
                                             stroke="#888888"
@@ -133,17 +164,22 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
                     <div className="space-y-4">
                         <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Recent Activity</h4>
                         <div className="space-y-4">
-                            {[1, 2, 3].map((i) => (
-                                <div key={i} className="flex gap-4">
-                                    <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                                        <Calendar className="h-4 w-4 text-red-600" />
+                            {stats.recentActivity.length > 0 ? stats.recentActivity.map((lead) => (
+                                <div key={lead.id} className="flex gap-4">
+                                    <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                        <Calendar className="h-4 w-4 text-slate-600" />
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-sm font-medium">Updated lead status to Qualified</p>
-                                        <p className="text-xs text-muted-foreground">2 hours ago • Safari Adventure Package</p>
+                                        <p className="text-sm font-medium">Lead: {lead.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Status: <span className="uppercase text-[10px] font-bold text-indigo-500">{lead.status}</span> • {format(parseISO(lead.created_at || new Date().toISOString()), 'MMM d, h:mm a')}
+                                            {lead.tour_interest ? ` • Tour: ${lead.tour_interest}` : ''}
+                                        </p>
                                     </div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="text-sm text-muted-foreground text-center py-4">No recent activity.</div>
+                            )}
                         </div>
                     </div>
                 </div>
