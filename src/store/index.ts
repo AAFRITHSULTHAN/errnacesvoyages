@@ -29,6 +29,7 @@ interface AppState {
     addStaff: (user: User, password?: string) => Promise<void>;
     updateStaff: (id: string, updates: Partial<User>) => Promise<void>;
     deleteStaff: (id: string) => Promise<void>;
+    sendWhatsApp: (leadId: string, to: string, message: string, contentSid?: string, contentVariables?: Record<string, string>) => Promise<void>;
 }
 
 // Mock Data removed
@@ -165,9 +166,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             }));
             await api.deleteLead(id);
             toast.success('Lead deleted successfully');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to delete lead:', error);
-            toast.error('Failed to delete lead');
+            const errMsg = error?.message || error?.details || (error instanceof Error ? error.message : 'Unknown error');
+            toast.error(`Failed to delete lead: ${errMsg}`);
             get().fetchLeads();
         }
     },
@@ -277,6 +279,32 @@ export const useAppStore = create<AppState>((set, get) => ({
             console.error('Failed to delete staff:', error);
             toast.error('Failed to delete staff');
             get().fetchStaff();
+        }
+    },
+    sendWhatsApp: async (leadId, to, message, contentSid, contentVariables) => {
+        try {
+            await api.sendWhatsAppMessage(to, message, contentSid, contentVariables);
+            
+            let loggedContent = message;
+            if (contentSid) {
+                loggedContent = `[Template ${contentSid}] ${message}`;
+            }
+
+            try {
+                await supabase.from('whatsapp_messages').insert([{
+                    lead_id: leadId,
+                    sender: 'user',
+                    content: loggedContent,
+                    status: 'sent'
+                }]);
+            } catch (dbError) {
+                console.error('Failed to save WhatsApp message to database:', dbError);
+            }
+            toast.success('WhatsApp message sent successfully');
+        } catch (error: any) {
+            console.error('Failed to send WhatsApp message:', error);
+            toast.error(error.message || 'Failed to send WhatsApp message');
+            throw error;
         }
     },
 }));

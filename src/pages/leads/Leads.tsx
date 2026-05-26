@@ -16,6 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Lead } from '@/types';
 import { KPICards } from '@/components/dashboard/KPICards';
 import { useI18n } from '@/i18n';
+import { WhatsAppModal } from '@/components/leads/WhatsAppModal';
 
 import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 
@@ -24,6 +25,7 @@ export function Leads() {
     const leads = useFilteredLeads();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | undefined>(undefined);
+    const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
     const { t } = useI18n();
 
     useEffect(() => {
@@ -218,6 +220,7 @@ export function Leads() {
                         leads={leads}
                         onEdit={handleEditLead}
                         onDelete={handleDeleteLead}
+                        onWhatsApp={(lead) => setWhatsappLead(lead)}
                     />
                 </div>
             </div>
@@ -237,6 +240,12 @@ export function Leads() {
                     />
                 </DialogContent>
             </Dialog>
+
+            <WhatsAppModal
+                lead={whatsappLead}
+                isOpen={!!whatsappLead}
+                onClose={() => setWhatsappLead(null)}
+            />
         </div>
     );
 }

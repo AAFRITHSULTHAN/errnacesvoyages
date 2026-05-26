@@ -7,8 +7,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Mail, Phone, Calendar, Hash } from "lucide-react";
+import { Edit, Trash2, Mail, Phone, Calendar, Hash, MessageSquare } from "lucide-react";
 import type { Lead } from "@/types";
 import { format, parseISO } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,9 +17,10 @@ interface LeadsTableProps {
     leads: Lead[];
     onEdit: (lead: Lead) => void;
     onDelete: (id: string) => void;
+    onWhatsApp: (lead: Lead) => void;
 }
 
-export function LeadsTable({ leads, onEdit, onDelete }: LeadsTableProps) {
+export function LeadsTable({ leads, onEdit, onDelete, onWhatsApp }: LeadsTableProps) {
     const getStatusStyles = (status: string) => {
         switch (status) {
             case 'new': return 'bg-rose-50 text-rose-700 border-rose-100';
@@ -61,7 +61,13 @@ export function LeadsTable({ leads, onEdit, onDelete }: LeadsTableProps) {
                             <TableRow
                                 key={lead.id}
                                 className="group bg-white hover:bg-indigo-50/30 transition-all duration-200 border border-slate-100 rounded-2xl overflow-hidden shadow-sm shadow-slate-200/50 mb-2 cursor-pointer"
-                                onClick={() => onEdit(lead)}
+                                onClick={(e) => {
+                                    const target = e.target as HTMLElement;
+                                    if (target.closest('.actions-container') || target.closest('button')) {
+                                        return;
+                                    }
+                                    onEdit(lead);
+                                }}
                             >
                                 <TableCell className="pl-8 py-5">
                                     <div className="flex items-center gap-4">
@@ -126,23 +132,28 @@ export function LeadsTable({ leads, onEdit, onDelete }: LeadsTableProps) {
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-right pr-8">
-                                    <div className="flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
+                                    <div className="actions-container flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onWhatsApp(lead); }}
+                                            className="h-9 w-9 p-0 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center justify-center transition-colors"
+                                            title="Send WhatsApp"
+                                        >
+                                            <MessageSquare className="h-4 w-4" />
+                                        </button>
+                                        <button
                                             onClick={(e) => { e.stopPropagation(); onEdit(lead); }}
-                                            className="h-9 w-9 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                                            className="h-9 w-9 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center justify-center transition-colors"
+                                            title="Edit Lead"
                                         >
                                             <Edit className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
+                                        </button>
+                                        <button
                                             onClick={(e) => { e.stopPropagation(); onDelete(lead.id); }}
-                                            className="h-9 w-9 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                                            className="h-9 w-9 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg flex items-center justify-center transition-colors"
+                                            title="Delete Lead"
                                         >
                                             <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        </button>
                                     </div>
                                 </TableCell>
                             </TableRow>

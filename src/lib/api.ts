@@ -54,12 +54,12 @@ export async function updateLead(id: string, updates: Partial<Lead>) {
 }
 
 export async function deleteLead(id: string) {
-    const { error } = await supabase
-        .from('leads')
-        .delete()
-        .eq('id', id);
+    const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+        body: { action: 'delete_lead', leadId: id },
+    });
 
     if (error) throw error;
+    return data;
 }
 
 // --- TOURS ---
@@ -250,4 +250,20 @@ export async function deleteStaff(id: string) {
         .eq('id', id);
 
     if (error) throw error;
+}
+
+// --- WHATSAPP ---
+
+export async function sendWhatsAppMessage(
+    to: string, 
+    message: string, 
+    contentSid?: string, 
+    contentVariables?: Record<string, string>
+) {
+    const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+        body: { to, message, contentSid, contentVariables },
+    });
+
+    if (error) throw error;
+    return data;
 }

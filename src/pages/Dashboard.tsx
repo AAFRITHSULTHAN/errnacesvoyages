@@ -159,6 +159,7 @@ export function Dashboard() {
                     <Button
                         variant="ghost"
                         className="bg-white/80 backdrop-blur-sm border border-slate-200/60 hover:bg-slate-50 h-11 px-6 rounded-xl shadow-sm font-bold text-slate-700 shrink-0"
+                        onClick={() => navigate('/whatsapp', { state: { startBroadcast: true } })}
                     >
                         <Send className="mr-2 h-4 w-4 text-blue-600" /> {t('broadcast')}
                     </Button>
