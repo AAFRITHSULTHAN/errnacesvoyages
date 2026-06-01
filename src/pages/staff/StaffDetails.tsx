@@ -19,8 +19,6 @@ import {
     ArrowLeft,
     Edit,
     Trash2,
-    Mail,
-    Phone,
     MessageSquare,
     Send,
     Smile,
@@ -226,13 +224,16 @@ export function StaffDetails() {
         const file = e.target.files?.[0];
         if (!file || !member?.phone) return;
 
+        const staffId = member.id;
+        const staffPhone = member.phone;
+
         setIsAttaching(true);
         try {
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = async (event) => {
                 const base64Data = event.target?.result as string;
-                await sendWhatsApp(member.id, member.phone, base64Data);
+                await sendWhatsApp(staffId, staffPhone, base64Data);
                 setIsAttaching(false);
                 if (fileInputRef.current) fileInputRef.current.value = '';
             };

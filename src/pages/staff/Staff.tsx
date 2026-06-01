@@ -42,7 +42,6 @@ export function Staff() {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<User | undefined>(undefined);
     const { t } = useI18n();
 
