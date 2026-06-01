@@ -381,237 +381,10 @@ export function StaffDetails() {
 
             {/* Grid Layout Details */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-                {/* Left Side: Stats, Analytics, Directory, WhatsApp */}
+                {/* Left Side: WhatsApp & Directory Table */}
                 <div className="lg:col-span-2 flex flex-col gap-6">
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {[
-                            { label: 'Assigned', value: stats.totalLeads, icon: Users, color: 'violet' },
-                            { label: 'Converted', value: stats.dealsClosed, icon: CheckCircle2, color: 'emerald' },
-                            { label: 'Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'indigo' },
-                            { label: 'Efficiency', value: `${stats.conversion}%`, icon: TrendingUp, color: 'amber' }
-                        ].map((item) => (
-                            <Card key={item.label} className="border-none shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] bg-white overflow-hidden group hover:-translate-y-1 transition-all duration-300 rounded-[1.5rem]">
-                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                                    <div className={cn(
-                                        "p-2.5 rounded-xl mb-3 transition-all duration-500 group-hover:rotate-6",
-                                        item.color === 'violet' ? "bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white" :
-                                            item.color === 'emerald' ? "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white" :
-                                                item.color === 'indigo' ? "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white" :
-                                                    "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"
-                                    )}>
-                                        <item.icon className="h-4 w-4" />
-                                    </div>
-                                    <div className="text-xl font-black text-slate-800 tracking-tight">{item.value}</div>
-                                    <div className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">{item.label}</div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-
-                    {/* Performance Analytics Card */}
-                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/70 backdrop-blur-sm">
-                        <CardHeader className="border-b border-slate-100/50 pb-4">
-                            <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                                <TrendingUp className="h-4 w-4 text-indigo-500" />
-                                Performance & Revenue Analytics
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* Chart 1: Pie Chart for Lead Distribution */}
-                            <div className="flex flex-col items-center">
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Lead Status Distribution</h4>
-                                {statusData.length > 0 ? (
-                                    <div className="h-[180px] w-full relative flex items-center justify-center">
-                                        <div className="absolute flex flex-col items-center justify-center pointer-events-none">
-                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Leads</span>
-                                            <span className="text-xl font-black text-slate-900 leading-none mt-1">{stats.totalLeads}</span>
-                                        </div>
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <defs>
-                                                    {['#6366f1', '#10b981', '#f59e0b', '#a855f7', '#ef4444', '#3b82f6'].map((color, i) => (
-                                                        <linearGradient key={i} id={`staffPieGradient-${i}`} x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="0%" stopColor={color} stopOpacity={1} />
-                                                            <stop offset="100%" stopColor={color} stopOpacity={0.6} />
-                                                        </linearGradient>
-                                                    ))}
-                                                </defs>
-                                                <Pie
-                                                    data={statusData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={50}
-                                                    outerRadius={75}
-                                                    paddingAngle={3}
-                                                    dataKey="value"
-                                                >
-                                                    {statusData.map((_entry, index) => (
-                                                        <Cell
-                                                            key={`cell-${index}`}
-                                                            fill={`url(#staffPieGradient-${index % 6})`}
-                                                            stroke="#fff"
-                                                            strokeWidth={3}
-                                                            className="focus:outline-none outline-none"
-                                                        />
-                                                    ))}
-                                                </Pie>
-                                                <RechartsTooltip
-                                                    content={({ active, payload }) => {
-                                                        if (active && payload && payload.length) {
-                                                            return (
-                                                                <div className="bg-white/95 backdrop-blur-xl p-3 rounded-2xl border border-white shadow-xl animate-in zoom-in-95 duration-150">
-                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">{payload[0].name}</p>
-                                                                    <div className="flex items-baseline gap-1.5 mt-1">
-                                                                        <span className="text-xl font-black text-slate-900 leading-none">{payload[0].value}</span>
-                                                                        <span className="text-[10px] font-bold text-slate-500">({Math.round((Number(payload[0].value) / stats.totalLeads) * 100)}%)</span>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    }}
-                                                />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                ) : (
-                                    <div className="h-[180px] w-full flex items-center justify-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">No leads assigned yet</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Chart 2: Cumulative Area Chart for Revenue Trend */}
-                            <div className="flex flex-col items-center">
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Cumulative Revenue Trend</h4>
-                                {stats.dealsClosed > 0 ? (
-                                    <div className="h-[180px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={revenueData} margin={{ left: 10, right: 10, top: 10, bottom: 0 }}>
-                                                <defs>
-                                                    <linearGradient id="staffRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(203, 213, 225, 0.4)" />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    stroke="#94a3b8"
-                                                    fontSize={9}
-                                                    fontWeight={700}
-                                                    tickLine={false}
-                                                    axisLine={false}
-                                                />
-                                                <YAxis
-                                                    stroke="#94a3b8"
-                                                    fontSize={9}
-                                                    fontWeight={700}
-                                                    tickLine={false}
-                                                    axisLine={false}
-                                                    tickFormatter={(val) => `$${val}`}
-                                                />
-                                                <RechartsTooltip
-                                                    content={({ active, payload }) => {
-                                                        if (active && payload && payload.length) {
-                                                            const dataPoint = payload[0].payload;
-                                                            return (
-                                                                <div className="bg-white/95 backdrop-blur-xl p-3 rounded-2xl border border-white shadow-xl animate-in zoom-in-95 duration-150">
-                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{dataPoint.date}</p>
-                                                                    <div className="mt-1 space-y-0.5">
-                                                                        <p className="text-[10px] font-bold text-slate-500">Cumulative Revenue: <span className="font-black text-slate-900">${dataPoint.revenue.toLocaleString()}</span></p>
-                                                                        {dataPoint.amount > 0 && (
-                                                                            <p className="text-[10px] font-bold text-slate-500">Deal Budget: <span className="font-black text-emerald-600">+${dataPoint.amount.toLocaleString()}</span></p>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    }}
-                                                />
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="revenue"
-                                                    stroke="#8b5cf6"
-                                                    strokeWidth={3}
-                                                    fillOpacity={1}
-                                                    fill="url(#staffRevenueGradient)"
-                                                />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                ) : (
-                                    <div className="h-[180px] w-full flex items-center justify-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">No closed deals yet</p>
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Client Directory Luxury Table */}
-                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/70 backdrop-blur-sm">
-                        <CardHeader className="border-b border-slate-100/50 pb-4">
-                            <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                                <Users className="h-4 w-4 text-indigo-500" />
-                                Client Directory ({stats.totalLeads})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-6">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50/50 backdrop-blur-sm border-b border-slate-100">
-                                        <tr>
-                                            <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Client Identity</th>
-                                            <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
-                                            <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Budget</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {stats.staffLeads.length > 0 ? stats.staffLeads.map((lead) => (
-                                            <tr key={lead.id} className="group hover:bg-indigo-50/30 transition-all duration-300">
-                                                <td className="px-6 py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm transition-transform group-hover:scale-110">
-                                                            {lead.name[0]}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[12px] font-black text-slate-800 leading-tight">{lead.name}</p>
-                                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Joined {format(parseISO(lead.created_at), 'MMM yyyy')}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-3">
-                                                    <div className="flex justify-center">
-                                                        <Badge className={cn(
-                                                            "uppercase text-[7px] font-black tracking-[0.15em] px-2 py-0.5 rounded-full border-none shadow-sm",
-                                                            lead.status === 'converted' ? "bg-emerald-500 text-white" :
-                                                                lead.status === 'lost' ? "bg-rose-500 text-white" :
-                                                                    "bg-indigo-500 text-white"
-                                                        )}>
-                                                            {lead.status}
-                                                        </Badge>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-3 text-right">
-                                                    <p className="text-[12px] font-black text-slate-900 tracking-tight">${(lead.budget || 0).toLocaleString()}</p>
-                                                </td>
-                                            </tr>
-                                        )) : (
-                                            <tr>
-                                                <td colSpan={3} className="px-6 py-10 text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] italic">No active records found.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-
                     {/* WhatsApp Messages Chat Window */}
-                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/70 backdrop-blur-sm flex flex-col h-[500px]">
+                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/70 backdrop-blur-sm flex flex-col h-[550px]">
                         <CardHeader className="border-b border-slate-100 pb-4 flex flex-row items-center justify-between flex-none bg-white">
                             <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                                 <MessageSquare className="h-4 w-4 text-blue-500" />
@@ -777,10 +550,70 @@ export function StaffDetails() {
                             </div>
                         )}
                     </Card>
+
+                    {/* Client Directory Luxury Table */}
+                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/70 backdrop-blur-sm">
+                        <CardHeader className="border-b border-slate-100/50 pb-4">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                <Users className="h-4 w-4 text-indigo-500" />
+                                Client Directory ({stats.totalLeads})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50/50 backdrop-blur-sm border-b border-slate-100">
+                                        <tr>
+                                            <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Client Identity</th>
+                                            <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
+                                            <th className="px-6 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Budget</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {stats.staffLeads.length > 0 ? stats.staffLeads.map((lead) => (
+                                            <tr key={lead.id} className="group hover:bg-indigo-50/30 transition-all duration-300">
+                                                <td className="px-6 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm transition-transform group-hover:scale-110">
+                                                            {lead.name[0]}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[12px] font-black text-slate-800 leading-tight">{lead.name}</p>
+                                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Joined {format(parseISO(lead.created_at), 'MMM yyyy')}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <div className="flex justify-center">
+                                                        <Badge className={cn(
+                                                            "uppercase text-[7px] font-black tracking-[0.15em] px-2 py-0.5 rounded-full border-none shadow-sm",
+                                                            lead.status === 'converted' ? "bg-emerald-500 text-white" :
+                                                                lead.status === 'lost' ? "bg-rose-500 text-white" :
+                                                                    "bg-indigo-500 text-white"
+                                                        )}>
+                                                            {lead.status}
+                                                        </Badge>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-3 text-right">
+                                                    <p className="text-[12px] font-black text-slate-900 tracking-tight">${(lead.budget || 0).toLocaleString()}</p>
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={3} className="px-6 py-10 text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] italic">No active records found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
-                {/* Right Side: Sidebar Info */}
+                {/* Right Side: Profile Info, 2x2 Stats, & Compact Charts */}
                 <div className="flex flex-col gap-6">
+                    {/* Staff Profile Info */}
                     <Card className="border-none shadow-sm rounded-3xl bg-white/70 backdrop-blur-sm overflow-hidden">
                         <CardHeader className="border-b border-slate-100/50 pb-4">
                             <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
@@ -829,6 +662,166 @@ export function StaffDetails() {
                                 </div>
                             </div>
                         </CardContent>
+                    </Card>
+
+                    {/* Stats 2x2 Grid */}
+                    <div className="grid grid-cols-2 gap-3">
+                        {[
+                            { label: 'Assigned', value: stats.totalLeads, icon: Users, color: 'violet' },
+                            { label: 'Converted', value: stats.dealsClosed, icon: CheckCircle2, color: 'emerald' },
+                            { label: 'Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'indigo' },
+                            { label: 'Efficiency', value: `${stats.conversion}%`, icon: TrendingUp, color: 'amber' }
+                        ].map((item) => (
+                            <Card key={item.label} className="border-none shadow-sm bg-white overflow-hidden group hover:-translate-y-1 transition-all duration-300 rounded-[1.2rem]">
+                                <CardContent className="p-3.5 flex flex-col items-center justify-center text-center">
+                                    <div className={cn(
+                                        "p-2 rounded-xl mb-2 transition-all duration-500 group-hover:rotate-6",
+                                        item.color === 'violet' ? "bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white" :
+                                            item.color === 'emerald' ? "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white" :
+                                                item.color === 'indigo' ? "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white" :
+                                                    "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"
+                                    )}>
+                                        <item.icon className="h-3.5 w-3.5" />
+                                    </div>
+                                    <div className="text-base font-black text-slate-800 tracking-tight leading-none">{item.value}</div>
+                                    <div className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest mt-1.5">{item.label}</div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+
+                    {/* Doughnut Chart: Lead Status */}
+                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/70 backdrop-blur-sm p-4 flex flex-col items-center">
+                        <h4 className="text-[8.5px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 flex items-center gap-1.5 leading-none">
+                            <Users className="h-3.5 w-3.5 text-indigo-500" />
+                            Lead Status Distribution
+                        </h4>
+                        {statusData.length > 0 ? (
+                            <div className="h-[160px] w-full relative flex items-center justify-center">
+                                <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+                                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Leads</span>
+                                    <span className="text-base font-black text-slate-900 leading-none mt-1">{stats.totalLeads}</span>
+                                </div>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <defs>
+                                            {['#6366f1', '#10b981', '#f59e0b', '#a855f7', '#ef4444', '#3b82f6'].map((color, i) => (
+                                                <linearGradient key={i} id={`staffPieGradient-${i}`} x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                                    <stop offset="100%" stopColor={color} stopOpacity={0.6} />
+                                                </linearGradient>
+                                            ))}
+                                        </defs>
+                                        <Pie
+                                            data={statusData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={45}
+                                            outerRadius={65}
+                                            paddingAngle={3}
+                                            dataKey="value"
+                                        >
+                                            {statusData.map((_entry, index) => (
+                                                <Cell
+                                                    key={`cell-${index}`}
+                                                    fill={`url(#staffPieGradient-${index % 6})`}
+                                                    stroke="#fff"
+                                                    strokeWidth={2}
+                                                    className="focus:outline-none outline-none"
+                                                />
+                                            ))}
+                                        </Pie>
+                                        <RechartsTooltip
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    return (
+                                                        <div className="bg-white/95 backdrop-blur-xl p-2.5 rounded-xl border border-white shadow-xl">
+                                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">{payload[0].name}</p>
+                                                            <div className="flex items-baseline gap-1 mt-0.5">
+                                                                <span className="text-base font-black text-slate-900 leading-none">{payload[0].value}</span>
+                                                                <span className="text-[9px] font-bold text-slate-500">({Math.round((Number(payload[0].value) / stats.totalLeads) * 100)}%)</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="h-[160px] w-full flex items-center justify-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">No leads assigned</p>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Area Chart: Revenue Trend */}
+                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/70 backdrop-blur-sm p-4 flex flex-col items-center">
+                        <h4 className="text-[8.5px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 flex items-center gap-1.5 leading-none">
+                            <TrendingUp className="h-3.5 w-3.5 text-violet-500" />
+                            Cumulative Revenue Trend
+                        </h4>
+                        {stats.dealsClosed > 0 ? (
+                            <div className="h-[160px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={revenueData} margin={{ left: -10, right: 10, top: 10, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="staffRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(203, 213, 225, 0.4)" />
+                                        <XAxis
+                                            dataKey="date"
+                                            stroke="#94a3b8"
+                                            fontSize={8}
+                                            fontWeight={700}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <YAxis
+                                            stroke="#94a3b8"
+                                            fontSize={8}
+                                            fontWeight={700}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickFormatter={(val) => `$${val}`}
+                                        />
+                                        <RechartsTooltip
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    const dataPoint = payload[0].payload;
+                                                    return (
+                                                        <div className="bg-white/95 backdrop-blur-xl p-2.5 rounded-xl border border-white shadow-xl">
+                                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">{dataPoint.date}</p>
+                                                            <div className="mt-1">
+                                                                <p className="text-[9px] font-bold text-slate-500">Revenue: <span className="font-black text-slate-900">${dataPoint.revenue.toLocaleString()}</span></p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="revenue"
+                                            stroke="#8b5cf6"
+                                            strokeWidth={2.5}
+                                            fillOpacity={1}
+                                            fill="url(#staffRevenueGradient)"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="h-[160px] w-full flex items-center justify-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">No closed deals yet</p>
+                            </div>
+                        )}
                     </Card>
                 </div>
             </div>
