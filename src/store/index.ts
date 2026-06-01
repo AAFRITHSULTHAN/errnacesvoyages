@@ -282,21 +282,27 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
     },
     sendWhatsApp: async (leadId, to, message, contentSid, contentVariables) => {
+        console.log('Store: sendWhatsApp called', { leadId, to, message, contentSid, contentVariables });
         try {
-            await api.sendWhatsAppMessage(to, message, contentSid, contentVariables);
+            const twilioMessage = message.startsWith('data:image/') ? '📷 Sent a photo' : message;
+            console.log('Store: Calling api.sendWhatsAppMessage...');
+            const apiResult = await api.sendWhatsAppMessage(to, twilioMessage, contentSid, contentVariables);
+            console.log('Store: api.sendWhatsAppMessage success', apiResult);
             
             let loggedContent = message;
             if (contentSid) {
                 loggedContent = `[Template ${contentSid}] ${message}`;
             }
 
+            console.log('Store: Saving message log to Supabase db...');
             try {
-                await supabase.from('whatsapp_messages').insert([{
+                const dbResult = await supabase.from('whatsapp_messages').insert([{
                     lead_id: leadId,
                     sender: 'user',
                     content: loggedContent,
                     status: 'sent'
                 }]);
+                console.log('Store: Supabase db insert result', dbResult);
             } catch (dbError) {
                 console.error('Failed to save WhatsApp message to database:', dbError);
             }

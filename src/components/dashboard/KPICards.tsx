@@ -3,6 +3,7 @@ import type { KPI } from '@/types';
 import { Users, Map, DollarSign, TrendingUp, UserCheck, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
+import { Link } from 'react-router-dom';
 
 const ICON_MAP: Record<string, { icon: any; color: string; bgColor: string; shadowColor: string }> = {
     Users: { icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-50', shadowColor: 'shadow-blue-200' },
@@ -25,8 +26,11 @@ export function KPICards({ kpis }: KPICardsProps) {
                 const Icon = iconConfig.icon;
                 const isPositive = (kpi.change || 0) >= 0;
 
-                return (
-                    <Card key={kpi.label} className="relative overflow-hidden border-none bg-white shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 group rounded-xl">
+                const CardElement = (
+                    <Card className={cn(
+                        "relative overflow-hidden border-none bg-white shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 group rounded-xl h-full",
+                        kpi.link && "cursor-pointer hover:bg-slate-50/50"
+                    )}>
                         <div className="flex flex-row items-center justify-between space-y-0 pb-0.5 pt-2.5 px-3 relative z-10">
                             <div className={cn(
                                 "p-1.5 rounded-lg transition-all duration-300 group-hover:rotate-6",
@@ -63,6 +67,20 @@ export function KPICards({ kpis }: KPICardsProps) {
                             isPositive ? 'bg-emerald-400' : 'bg-rose-400'
                         )} />
                     </Card>
+                );
+
+                if (kpi.link) {
+                    return (
+                        <Link key={kpi.label} to={kpi.link} className="block no-underline h-full">
+                            {CardElement}
+                        </Link>
+                    );
+                }
+
+                return (
+                    <div key={kpi.label} className="h-full">
+                        {CardElement}
+                    </div>
                 );
             })}
         </div>

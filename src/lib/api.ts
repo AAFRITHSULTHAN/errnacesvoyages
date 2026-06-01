@@ -1,12 +1,6 @@
-import { supabase } from './supabase';
+import { supabase, anonClient } from './supabase';
 import type { Lead, TourPackage } from '@/types';
-import { createClient } from '@supabase/supabase-js';
 
-// A secondary client that explicitly uses the anon key for reads.
-// This ensures custom-auth staff sessions (no Supabase JWT) can still read data.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const anonClient = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- LEADS ---
 
@@ -260,10 +254,32 @@ export async function sendWhatsAppMessage(
     contentSid?: string, 
     contentVariables?: Record<string, string>
 ) {
-    const { data, error } = await supabase.functions.invoke('send-whatsapp', {
-        body: { to, message, contentSid, contentVariables },
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
+    
+    // Get the current session if available to use the authenticated JWT
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || supabaseAnonKey;
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({ to, message, contentSid, contentVariables }),
     });
 
-    if (error) throw error;
-    return data;
+    if (!response.ok) {
+        const errText = await response.text();
+        let errMsg = 'Failed to invoke send-whatsapp function';
+        try {
+            const errObj = JSON.parse(errText);
+            errMsg = errObj.error || errObj.message || errMsg;
+        } catch (_) {}
+        throw new Error(errMsg);
+    }
+
+    return await response.json();
 }

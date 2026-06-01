@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,11 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/Toast';
 
-import { Search, MoreVertical, Paperclip, Send, Smile, CheckCheck, AlertTriangle, Users, Loader2 } from 'lucide-react';
+import { Search, MoreVertical, Paperclip, Send, Smile, CheckCheck, Check, AlertTriangle, Users, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useAppStore } from '@/store';
-import { supabase } from '@/lib/supabase';
+import { supabase, anonClient } from '@/lib/supabase';
 
 type Message = {
     id: string;
@@ -34,7 +34,8 @@ type Contact = {
 };
 
 export function WhatsApp() {
-    const leads = useAppStore(state => state.leads);
+    const rawLeads = useAppStore(state => state.leads);
+    const leads = useMemo(() => rawLeads.filter(l => l.source !== 'Staff'), [rawLeads]);
     const fetchLeads = useAppStore(state => state.fetchLeads);
     const sendWhatsApp = useAppStore(state => state.sendWhatsApp);
     const location = useLocation();
@@ -45,6 +46,47 @@ export function WhatsApp() {
     const [lastMessages, setLastMessages] = useState<Record<string, { content: string, created_at: string }>>({});
     const [searchTerm, setSearchTerm] = useState('');
     const [dbError, setDbError] = useState(false);
+    const [isLastMessagesLoaded, setIsLastMessagesLoaded] = useState(false);
+
+    // Emoji Picker, Search and Attachment states
+    const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+    const [isSearchActive, setIsSearchActive] = useState(false);
+    const [messageSearchQuery, setMessageSearchQuery] = useState('');
+    const [isAttaching, setIsAttaching] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const emojis = [
+        '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
+    ];
+
+    const handleEmojiClick = (emoji: string) => {
+        setMessageInput(prev => prev + emoji);
+    };
+
+    const handleAttachmentClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !selectedContact) return;
+
+        setIsAttaching(true);
+        try {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async (event) => {
+                const base64Data = event.target?.result as string;
+                await sendWhatsApp(selectedContact.id, selectedContact.phone, base64Data);
+                setIsAttaching(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            };
+        } catch (err) {
+            console.error('Failed to attach file:', err);
+            toast.error('Failed to attach image');
+            setIsAttaching(false);
+        }
+    };
 
     // Auto-enable broadcast if triggered from dashboard navigation state
     useEffect(() => {
@@ -156,10 +198,14 @@ export function WhatsApp() {
     // Fetch last messages to show in the sidebar list
     const fetchLastMessages = async () => {
         try {
-            const { data, error } = await supabase
+            console.log('[WhatsApp Debug] fetchLastMessages initiating...');
+            const { data: { session } } = await supabase.auth.getSession();
+            const client = session ? supabase : anonClient;
+            const { data, error } = await client
                 .from('whatsapp_messages')
                 .select('lead_id, content, created_at')
                 .order('created_at', { ascending: false });
+            console.log('[WhatsApp Debug] fetchLastMessages result:', { count: data?.length, error });
             if (!error && data) {
                 setDbError(false);
                 const mapping: Record<string, { content: string, created_at: string }> = {};
@@ -178,6 +224,8 @@ export function WhatsApp() {
         } catch (e) {
             console.error('Failed to fetch last messages:', e);
             setDbError(true);
+        } finally {
+            setIsLastMessagesLoaded(true);
         }
     };
 
@@ -187,41 +235,138 @@ export function WhatsApp() {
         }
     }, [leads]);
 
-    // Deriving contacts list from leads and sorting by lastMessageTime descending
-    const contacts: Contact[] = leads
-        .filter(lead => lead.phone && lead.phone.trim() !== '')
-        .map(lead => {
-            const lastMsgInfo = lastMessages[lead.id];
-            return {
-                id: lead.id,
-                name: lead.name,
-                avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(lead.name)}`,
-                lastMessage: lastMsgInfo ? lastMsgInfo.content : (lead.notes || 'No messages yet'),
-                lastMessageTime: lastMsgInfo ? new Date(lastMsgInfo.created_at) : new Date(lead.created_at),
+    // Normalize phone helper
+    const normalizePhone = (phone: string) => {
+        return phone.replace(/\D/g, '');
+    };
+
+    // Group leads by normalized phone number
+    const leadsByPhone = useMemo(() => {
+        const groups: Record<string, typeof leads> = {};
+        leads.forEach(lead => {
+            if (lead.phone && lead.phone.trim() !== '') {
+                const norm = normalizePhone(lead.phone);
+                if (!groups[norm]) {
+                    groups[norm] = [];
+                }
+                groups[norm].push(lead);
+            }
+        });
+        return groups;
+    }, [leads]);
+
+    // Deriving contacts list grouped by phone number to combine duplicates and show all messages
+    const contacts: Contact[] = useMemo(() => {
+        const list: Contact[] = [];
+        
+        Object.entries(leadsByPhone).forEach(([_, phoneLeads]) => {
+            // Find the most recent lead in this group to use as primary metadata
+            const sortedLeads = [...phoneLeads].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            const primaryLead = sortedLeads[0];
+            
+            // Get all lead IDs for this phone number group
+            const leadIds = phoneLeads.map(l => l.id);
+            
+            // Find the most recent message across all these lead IDs
+            let lastMsg: { content: string; created_at: string } | null = null;
+            for (const id of leadIds) {
+                const msg = lastMessages[id];
+                if (msg) {
+                    if (!lastMsg || new Date(msg.created_at).getTime() > new Date(lastMsg.created_at).getTime()) {
+                        lastMsg = msg;
+                    }
+                }
+            }
+
+            // Combine names if they are different
+            const uniqueNames = Array.from(new Set(phoneLeads.map(l => l.name)));
+            const combinedName = uniqueNames.join(' / ');
+
+            list.push({
+                id: primaryLead.id,
+                name: combinedName,
+                avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(primaryLead.name)}`,
+                lastMessage: lastMsg ? (lastMsg.content.startsWith('data:image/') ? '📷 Photo' : lastMsg.content) : (primaryLead.notes || 'No messages yet'),
+                lastMessageTime: lastMsg ? new Date(lastMsg.created_at) : new Date(primaryLead.created_at),
                 status: 'online' as const,
-                phone: lead.phone
-            };
-        })
-        .sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
+                phone: primaryLead.phone,
+                leadIds: leadIds // Include all linked lead IDs
+            } as any);
+        });
+
+        // Sort by last message time descending
+        return list.sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
+    }, [leadsByPhone, lastMessages]);
 
     // Set initial selected contact
     useEffect(() => {
-        if (contacts.length > 0 && !selectedContact) {
+        if (isLastMessagesLoaded && contacts.length > 0 && !selectedContact) {
             setSelectedContact(contacts[0]);
         }
-    }, [contacts, selectedContact]);
+    }, [contacts, selectedContact, isLastMessagesLoaded]);
+
+    // Subscribe to leads database changes in real-time
+    useEffect(() => {
+        let activeClient = supabase;
+        let leadsChannel: any = null;
+        let isMounted = true;
+
+        const setupLeadsSubscription = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!isMounted) return;
+            activeClient = session ? supabase : anonClient;
+
+            leadsChannel = activeClient
+                .channel('global:leads_changes')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'leads'
+                    },
+                    () => {
+                        if (isMounted) {
+                            fetchLeads();
+                        }
+                    }
+                )
+                .subscribe();
+        };
+
+        setupLeadsSubscription();
+
+        return () => {
+            isMounted = false;
+            if (leadsChannel) {
+                activeClient.removeChannel(leadsChannel);
+            }
+        };
+    }, [fetchLeads]);
 
     // Fetch messages and subscribe to realtime updates when selected contact changes
     useEffect(() => {
         if (!selectedContact) return;
 
-        const fetchMessages = async () => {
+        const targetIds = (selectedContact as any).leadIds || [selectedContact.id];
+        let channel: any = null;
+        let activeClient = supabase;
+        let isMounted = true;
+
+        const fetchMessagesAndSubscribe = async () => {
             try {
-                const { data, error } = await supabase
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!isMounted) return;
+                activeClient = session ? supabase : anonClient;
+
+                console.log('[WhatsApp Debug] fetchMessages initiating for targetIds:', targetIds, 'selectedContact:', selectedContact);
+                const { data, error } = await activeClient
                     .from('whatsapp_messages')
                     .select('*')
-                    .eq('lead_id', selectedContact.id)
+                    .in('lead_id', targetIds)
                     .order('created_at', { ascending: true });
+                if (!isMounted) return;
+                console.log('[WhatsApp Debug] fetchMessages result:', { count: data?.length, error });
                 if (!error && data) {
                     setDbError(false);
                     setMessages(data.map(m => ({
@@ -237,57 +382,64 @@ export function WhatsApp() {
                         setDbError(true);
                     }
                 }
+
+                // Subscribe to all incoming/outgoing messages in real-time to update the sidebar dynamically
+                channel = activeClient
+                    .channel('global:whatsapp_messages')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'whatsapp_messages'
+                        },
+                        (payload) => {
+                            if (!isMounted) return;
+                            const newMessage = payload.new;
+                            
+                            // Update last message mapping dynamically for sidebar preview and sorting
+                            setLastMessages(prev => ({
+                                ...prev,
+                                [newMessage.lead_id]: {
+                                    content: newMessage.content,
+                                    created_at: newMessage.created_at
+                                }
+                            }));
+
+                            // If the new message is for the currently active phone number group, append it
+                            if (targetIds.includes(newMessage.lead_id)) {
+                                setMessages(prev => {
+                                    if (prev.some(m => m.id === newMessage.id)) return prev;
+                                    return [...prev, {
+                                        id: newMessage.id,
+                                        content: newMessage.content,
+                                        sender: newMessage.sender as 'user' | 'contact',
+                                        timestamp: new Date(newMessage.created_at),
+                                        status: newMessage.status as 'sent' | 'delivered' | 'read'
+                                    }];
+                                });
+                            }
+                        }
+                    )
+                    .subscribe();
+
             } catch (e) {
-                console.error(e);
-                setDbError(true);
+                if (isMounted) {
+                    console.error(e);
+                    setDbError(true);
+                }
             }
         };
 
-        fetchMessages();
-
-        // Subscribe to all incoming/outgoing messages in real-time to update the sidebar dynamically
-        const channel = supabase
-            .channel('global:whatsapp_messages')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'whatsapp_messages'
-                },
-                (payload) => {
-                    const newMessage = payload.new;
-                    
-                    // Update last message mapping dynamically for sidebar preview and sorting
-                    setLastMessages(prev => ({
-                        ...prev,
-                        [newMessage.lead_id]: {
-                            content: newMessage.content,
-                            created_at: newMessage.created_at
-                        }
-                    }));
-
-                    // If the new message is for the currently active chat, append it to the chat window
-                    if (newMessage.lead_id === selectedContact.id) {
-                        setMessages(prev => {
-                            if (prev.some(m => m.id === newMessage.id)) return prev;
-                            return [...prev, {
-                                id: newMessage.id,
-                                content: newMessage.content,
-                                sender: newMessage.sender as 'user' | 'contact',
-                                timestamp: new Date(newMessage.created_at),
-                                status: newMessage.status as 'sent' | 'delivered' | 'read'
-                            }];
-                        });
-                    }
-                }
-            )
-            .subscribe();
+        fetchMessagesAndSubscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            isMounted = false;
+            if (channel) {
+                activeClient.removeChannel(channel);
+            }
         };
-    }, [selectedContact?.id]);
+    }, [selectedContact?.phone, (selectedContact as any)?.leadIds?.join(',')]);
 
     // Auto-scroll to bottom of messages
     useEffect(() => {
@@ -657,17 +809,33 @@ export function WhatsApp() {
                                     <AvatarFallback>{selectedContact.name[0]}</AvatarFallback>
                                 </Avatar>
                                 <div>
-                                    <h3 className="font-semibold text-slate-900">{selectedContact.name}</h3>
-                                    <p className="text-xs text-slate-500 font-medium">
-                                        Lead • {selectedContact.phone}
+                                    <h3 className="font-semibold text-slate-900 leading-snug">{selectedContact.name}</h3>
+                                    <p className="text-[10px] text-slate-500 font-bold leading-none mt-0.5">
+                                        WhatsApp • {selectedContact.phone}
                                     </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="icon" className="text-slate-500">
-                                    <Search className="h-5 w-5" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="text-slate-500">
+                                {isSearchActive ? (
+                                    <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-2.5 py-1 border border-slate-200/50">
+                                        <input
+                                            type="text"
+                                            placeholder="Search messages..."
+                                            className="bg-transparent text-xs font-semibold focus:outline-none w-32 md:w-48 text-slate-700 placeholder-slate-400"
+                                            value={messageSearchQuery}
+                                            onChange={(e) => setMessageSearchQuery(e.target.value)}
+                                            autoFocus
+                                        />
+                                        <button onClick={() => { setIsSearchActive(false); setMessageSearchQuery(''); }} className="text-slate-400 hover:text-slate-600">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <Button variant="ghost" size="icon" className="text-slate-500 hover:bg-slate-50 rounded-xl" onClick={() => setIsSearchActive(true)}>
+                                        <Search className="h-5 w-5" />
+                                    </Button>
+                                )}
+                                <Button variant="ghost" size="icon" className="text-slate-500 hover:bg-slate-50 rounded-xl">
                                     <MoreVertical className="h-5 w-5" />
                                 </Button>
                             </div>
@@ -687,6 +855,9 @@ export function WhatsApp() {
                                 ) : (
                                     messages.map((message) => {
                                         const isUser = message.sender === 'user';
+                                        const matchesSearch = messageSearchQuery && message.content.toLowerCase().includes(messageSearchQuery.toLowerCase());
+                                        const isImage = message.content.startsWith('data:image/');
+
                                         return (
                                             <div
                                                 key={message.id}
@@ -697,18 +868,39 @@ export function WhatsApp() {
                                             >
                                                 <div
                                                     className={cn(
-                                                        "max-w-[70%] rounded-lg px-4 py-2 shadow-sm relative group",
+                                                        "max-w-[70%] rounded-lg px-4 py-2 shadow-sm relative group transition-all duration-300",
                                                         isUser
                                                             ? "bg-[#d9fdd3] text-slate-900 rounded-tr-none"
-                                                            : "bg-white text-slate-900 rounded-tl-none"
+                                                            : "bg-white text-slate-900 rounded-tl-none",
+                                                        matchesSearch ? "ring-2 ring-indigo-500/80 bg-indigo-50/20" : ""
                                                     )}
                                                 >
-                                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                                    {isImage ? (
+                                                        <div className="my-1">
+                                                            <img
+                                                                src={message.content}
+                                                                alt="Attachment"
+                                                                className="max-h-64 max-w-full rounded-lg object-contain border border-slate-200 bg-slate-50 cursor-pointer hover:opacity-95 transition-opacity"
+                                                                onClick={() => {
+                                                                    const w = window.open();
+                                                                    w?.document.write(`<img src="${message.content}" style="max-width:100%; max-height:100%; display:block; margin:auto;" />`);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                                    )}
                                                     <div className={cn("text-[9px] text-slate-400 mt-1 flex items-center gap-1 font-semibold", isUser ? "justify-end" : "justify-start")}>
                                                         {format(message.timestamp, 'h:mm a')}
                                                         {isUser && (
-                                                            <span className="text-[#53bdeb]">
-                                                                <CheckCheck className="h-3.5 w-3.5" />
+                                                            <span className={cn(
+                                                                message.status === 'read' ? "text-[#53bdeb]" : "text-slate-400"
+                                                            )}>
+                                                                {message.status === 'sent' ? (
+                                                                    <Check className="h-3.5 w-3.5" />
+                                                                ) : (
+                                                                    <CheckCheck className="h-3.5 w-3.5" />
+                                                                )}
                                                             </span>
                                                         )}
                                                     </div>
@@ -722,17 +914,67 @@ export function WhatsApp() {
                         </ScrollArea>
 
                         {/* Input Area */}
-                        <div className="p-4 bg-white border-t border-slate-200 z-10">
+                        <div className="p-4 bg-white border-t border-slate-200 z-10 relative">
+                            {/* Emoji Picker Popover */}
+                            {isEmojiOpen && (
+                                <div className="absolute bottom-16 left-4 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-30 w-72 max-h-60 overflow-y-auto animate-in slide-in-from-bottom duration-200">
+                                    <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-slate-100">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Select Emoji</span>
+                                        <button onClick={() => setIsEmojiOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-8 gap-1.5 justify-items-center">
+                                        {emojis.map((emoji, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => handleEmojiClick(emoji)}
+                                                className="text-xl hover:scale-125 transition-transform p-0.5 active:scale-90"
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Hidden file input for attachments */}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                            />
+
                             <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                                <Button type="button" variant="ghost" size="icon" className="text-slate-500">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn("text-slate-500 rounded-xl hover:bg-slate-50", isEmojiOpen && "bg-slate-100 text-slate-800")}
+                                    onClick={() => setIsEmojiOpen(!isEmojiOpen)}
+                                >
                                     <Smile className="h-6 w-6" />
                                 </Button>
-                                <Button type="button" variant="ghost" size="icon" className="text-slate-500">
-                                    <Paperclip className="h-5 w-5" />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn("text-slate-500 rounded-xl hover:bg-slate-50", isAttaching && "animate-pulse text-indigo-600")}
+                                    onClick={handleAttachmentClick}
+                                    disabled={isAttaching}
+                                >
+                                    {isAttaching ? (
+                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                    ) : (
+                                        <Paperclip className="h-5 w-5" />
+                                    )}
                                 </Button>
                                 <Input
                                     placeholder="Type a message"
-                                    className="flex-1 bg-white border-slate-200 focus-visible:ring-0 focus-visible:border-slate-300 font-medium"
+                                    className="flex-1 bg-white border-slate-200 focus-visible:ring-0 focus-visible:border-slate-300 font-medium rounded-xl h-11"
                                     value={messageInput}
                                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMessageInput(e.target.value)}
                                 />
@@ -740,7 +982,7 @@ export function WhatsApp() {
                                     type="submit" 
                                     size="icon" 
                                     className={cn(
-                                        "transition-all", 
+                                        "transition-all h-11 w-11 rounded-xl shrink-0", 
                                         messageInput.trim() ? "bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-500/10" : "bg-slate-100 text-slate-400"
                                     )}
                                 >

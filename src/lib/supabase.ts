@@ -10,6 +10,8 @@ const debugLock = async (_name: string, _acquireTimeout: number, fn: () => Promi
     return await fn();
 };
 
+export const anonClient = createClient(supabaseUrl, supabaseAnonKey);
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         storage: window.localStorage,
@@ -19,3 +21,4 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         lock: debugLock, // Force usage of our dummy lock
     },
 });
+

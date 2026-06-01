@@ -12,9 +12,11 @@ import { TourDetails } from '@/pages/tours/TourDetails';
 import { TourForm } from '@/pages/tours/TourForm';
 import { WhatsApp } from '@/pages/whatsapp/WhatsApp';
 import { Leads } from '@/pages/leads/Leads';
+import { LeadDetails } from '@/pages/leads/LeadDetails';
 import { Pipeline } from '@/pages/pipeline/Pipeline';
 import { Analytics } from '@/pages/analytics/Analytics';
 import { Staff } from '@/pages/staff/Staff';
+import { StaffDetails } from '@/pages/staff/StaffDetails';
 
 // ... inside Routes
 // This comment seems to be a remnant from the original context, removing it as it's not relevant to the final code structure.
@@ -47,6 +49,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="pipeline" element={<Pipeline />} />
         <Route path="leads" element={<Leads />} />
+        <Route path="leads/:id" element={<LeadDetails />} />
         <Route path="tours" element={<TourList />} />
         <Route path="tours/new" element={<TourForm />} />
         <Route path="tours/:id" element={<TourDetails />} />
@@ -55,6 +58,9 @@ function AppRoutes() {
         <Route path="analytics" element={<Analytics />} />
         <Route path="staff" element={
           user?.role === 'admin' ? <Staff /> : <Navigate to="/" replace />
+        } />
+        <Route path="staff/:id" element={
+          user?.role === 'admin' ? <StaffDetails /> : <Navigate to="/" replace />
         } />
       </Route>
     </Routes>

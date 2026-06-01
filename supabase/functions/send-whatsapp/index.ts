@@ -102,6 +102,23 @@ serve(async (req) => {
     const body = await req.json()
 
     // Handle delete_lead action using service role to bypass RLS
+    if (body.action === 'debug_db') {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+      const { data: leads } = await supabase.from('leads').select('*')
+      const { data: messages } = await supabase.from('whatsapp_messages').select('*')
+
+      return new Response(
+        JSON.stringify({ leads, messages }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+
     if (body.action === 'delete_lead') {
       const { leadId } = body
       if (!leadId) {

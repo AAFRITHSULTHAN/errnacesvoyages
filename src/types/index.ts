@@ -44,4 +44,5 @@ export type KPI = {
     value: string | number;
     change?: number; // percentage
     icon?: string;
+    link?: string;
 };

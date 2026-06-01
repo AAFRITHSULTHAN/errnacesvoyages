@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Plus, Send } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { KPICards } from '@/components/dashboard/KPICards';
 import { LeadsTrendChart } from '@/components/dashboard/LeadsTrendChart';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
@@ -7,7 +7,6 @@ import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { useAppStore } from '@/store';
 import { useMemo, useState } from 'react';
 import { format, subDays, parseISO } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
 import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 import {
     Dialog,
@@ -23,7 +22,6 @@ import { useI18n } from '@/i18n';
 export function Dashboard() {
     const { tours, addLead } = useAppStore();
     const leads = useFilteredLeads();
-    const navigate = useNavigate();
     const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
     const { t, language, setLanguage } = useI18n();
 
@@ -58,14 +56,14 @@ export function Dashboard() {
         ).length;
 
         const kpis = [
-            { label: t('totalLeads'), value: totalLeads.toString(), icon: 'Users' },
-            { label: t('activeTours'), value: activeTours.toString(), icon: 'Map' },
-            { label: t('conversionRate'), value: `${conversionRate}%`, icon: 'TrendingUp' },
-            { label: t('revenue'), value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign' },
-            { label: t('pendingFollowUps'), value: pendingFollowUps.toString(), icon: 'Calendar' },
-            { label: t('wonLeads'), value: convertedLeads.toString(), icon: 'UserCheck' },
-            { label: t('avgBudget'), value: convertedLeads > 0 ? `$${Math.round(totalRevenue / convertedLeads).toLocaleString()}` : '$0', icon: 'DollarSign' },
-            { label: t('lostLeads'), value: leads.filter(l => l.status === 'lost').length.toString(), icon: 'Users' },
+            { label: t('totalLeads'), value: totalLeads.toString(), icon: 'Users', link: '/leads' },
+            { label: t('activeTours'), value: activeTours.toString(), icon: 'Map', link: '/tours' },
+            { label: t('conversionRate'), value: `${conversionRate}%`, icon: 'TrendingUp', link: '/analytics' },
+            { label: t('revenue'), value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign', link: '/analytics' },
+            { label: t('pendingFollowUps'), value: pendingFollowUps.toString(), icon: 'Calendar', link: '/pipeline' },
+            { label: t('wonLeads'), value: convertedLeads.toString(), icon: 'UserCheck', link: '/leads' },
+            { label: t('avgBudget'), value: convertedLeads > 0 ? `$${Math.round(totalRevenue / convertedLeads).toLocaleString()}` : '$0', icon: 'DollarSign', link: '/analytics' },
+            { label: t('lostLeads'), value: leads.filter(l => l.status === 'lost').length.toString(), icon: 'Users', link: '/leads' },
         ];
 
         // 2. Leads Trend Data (Last 30 Days)
@@ -148,20 +146,6 @@ export function Dashboard() {
                         onClick={() => setIsLeadModalOpen(true)}
                     >
                         <Plus className="h-4 w-4" /> {t('newLead')}
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        className="bg-white/80 backdrop-blur-sm border border-slate-200/60 hover:bg-slate-50 h-11 px-6 rounded-xl shadow-sm font-bold text-slate-700 shrink-0"
-                        onClick={() => navigate('/tours/new')}
-                    >
-                        <Plus className="mr-2 h-4 w-4 text-emerald-600" /> {t('newTour')}
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        className="bg-white/80 backdrop-blur-sm border border-slate-200/60 hover:bg-slate-50 h-11 px-6 rounded-xl shadow-sm font-bold text-slate-700 shrink-0"
-                        onClick={() => navigate('/whatsapp', { state: { startBroadcast: true } })}
-                    >
-                        <Send className="mr-2 h-4 w-4 text-blue-600" /> {t('broadcast')}
                     </Button>
                 </div>
             </div>

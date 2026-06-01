@@ -12,6 +12,7 @@ import type { Lead } from "@/types";
 import { format, parseISO } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 interface LeadsTableProps {
     leads: Lead[];
@@ -21,6 +22,7 @@ interface LeadsTableProps {
 }
 
 export function LeadsTable({ leads, onEdit, onDelete, onWhatsApp }: LeadsTableProps) {
+    const navigate = useNavigate();
     const getStatusStyles = (status: string) => {
         switch (status) {
             case 'new': return 'bg-rose-50 text-rose-700 border-rose-100';
@@ -66,7 +68,7 @@ export function LeadsTable({ leads, onEdit, onDelete, onWhatsApp }: LeadsTablePr
                                     if (target.closest('.actions-container') || target.closest('button')) {
                                         return;
                                     }
-                                    onEdit(lead);
+                                    navigate(`/leads/${lead.id}`);
                                 }}
                             >
                                 <TableCell className="pl-8 py-5">

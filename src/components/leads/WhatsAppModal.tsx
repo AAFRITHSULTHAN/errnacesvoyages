@@ -24,49 +24,10 @@ export function WhatsAppModal({ lead, isOpen, onClose }: WhatsAppModalProps) {
     const [message, setMessage] = useState('');
     const [useTemplate, setUseTemplate] = useState(false);
     const [templateSid, setTemplateSid] = useState('HX2ada749a93d94f4a77cf706c63173358');
-    const [templateVars, setTemplateVars] = useState('');
     const [isSending, setIsSending] = useState(false);
     const sendWhatsApp = useAppStore(state => state.sendWhatsApp);
 
     if (!lead) return null;
-
-    const handleSend = async () => {
-        if (!useTemplate && !message.trim()) return;
-        if (useTemplate && !templateSid.trim()) return;
-
-        setIsSending(true);
-        try {
-            let parsedVars: Record<string, string> | undefined = undefined;
-            if (useTemplate && templateVars.trim()) {
-                parsedVars = {};
-                templateVars.split(',').forEach((val, idx) => {
-                    parsedVars![(idx + 1).toString()] = val.trim();
-                });
-            }
-
-            const finalMessage = useTemplate
-                ? (message.trim() || `[Template Sent: ${templateSid}]${templateVars ? ` with variables: ${templateVars}` : ''}`)
-                : message;
-
-            await sendWhatsApp(
-                lead.id, 
-                lead.phone, 
-                finalMessage, 
-                useTemplate ? templateSid.trim() : undefined, 
-                parsedVars
-            );
-
-            setMessage('');
-            setTemplateSid('HX2ada749a93d94f4a77cf706c63173358');
-            setTemplateVars('');
-            setUseTemplate(false);
-            onClose();
-        } catch (error) {
-            // Error is handled in the store with a toast
-        } finally {
-            setIsSending(false);
-        }
-    };
 
     const approvedTemplates = [
         {
@@ -76,11 +37,58 @@ export function WhatsAppModal({ lead, isOpen, onClose }: WhatsAppModalProps) {
         }
     ];
 
-    const sandboxTemplates = [
-        `Your appointment is coming up on May 27 at 10:00 AM`,
-        `Your Errances Voyages order of Bali package has shipped and should be delivered on June 1. Details: http://localhost:5173`,
-        `Your Errances Voyages code is 849310`
-    ];
+    const getPreviewMessage = (templateBody: string, leadName: string) => {
+        return templateBody.replace(/\{\{1\}\}/g, leadName);
+    };
+
+    const handleSend = async () => {
+        console.log('WhatsAppModal: handleSend initiated', { useTemplate, templateSid, message });
+        if (!useTemplate && !message.trim()) return;
+        if (useTemplate && !templateSid.trim()) return;
+
+        setIsSending(true);
+        try {
+            let parsedVars: Record<string, string> | undefined = undefined;
+            let finalMessage = message;
+
+            if (useTemplate) {
+                const selectedTemplate = approvedTemplates.find(t => t.sid === templateSid);
+                if (selectedTemplate) {
+                    parsedVars = { "1": lead.name };
+                    finalMessage = getPreviewMessage(selectedTemplate.body, lead.name);
+                } else {
+                    finalMessage = `[Template Sent: ${templateSid}]`;
+                }
+            }
+
+            console.log('WhatsAppModal: Calling sendWhatsApp store action with:', {
+                leadId: lead.id,
+                phone: lead.phone,
+                finalMessage,
+                templateSid: useTemplate ? templateSid.trim() : undefined,
+                parsedVars
+            });
+
+            await sendWhatsApp(
+                lead.id, 
+                lead.phone, 
+                finalMessage, 
+                useTemplate ? templateSid.trim() : undefined, 
+                parsedVars
+            );
+
+            console.log('WhatsAppModal: sendWhatsApp completed successfully');
+            setMessage('');
+            setTemplateSid('HX2ada749a93d94f4a77cf706c63173358');
+            setUseTemplate(false);
+            onClose();
+        } catch (error) {
+            console.error('WhatsAppModal: Error in handleSend:', error);
+            // Error is handled in the store with a toast
+        } finally {
+            setIsSending(false);
+        }
+    };
 
     const suggestedMessages = [
         `Hello ${lead.name}, thank you for your interest in Errances Voyages! How can we help you today?`,
@@ -133,25 +141,6 @@ export function WhatsAppModal({ lead, isOpen, onClose }: WhatsAppModalProps) {
                         <>
                             <div className="space-y-2">
                                 <div className="flex flex-col gap-1">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-amber-600">Sandbox Pre-approved Templates</Label>
-                                    <span className="text-[9px] font-medium text-amber-500/80 leading-none">Use these to contact new numbers that haven't messaged you first</span>
-                                </div>
-                                <div className="grid gap-2">
-                                    {sandboxTemplates.map((msg, i) => (
-                                        <button
-                                            key={i}
-                                            type="button"
-                                            onClick={() => setMessage(msg)}
-                                            className="text-left p-2.5 rounded-xl border border-amber-100 bg-amber-50/20 hover:bg-amber-50 hover:border-amber-300 transition-all text-xs font-bold text-slate-600 hover:text-amber-800"
-                                        >
-                                            {msg}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex flex-col gap-1">
                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Custom CRM Templates</Label>
                                     <span className="text-[9px] font-medium text-slate-400 leading-none">Only works if the lead messaged you in the last 24 hours</span>
                                 </div>
@@ -191,7 +180,6 @@ export function WhatsAppModal({ lead, isOpen, onClose }: WhatsAppModalProps) {
                                             type="button"
                                             onClick={() => {
                                                 setTemplateSid(t.sid);
-                                                setMessage(t.body);
                                             }}
                                             className={`text-left p-2.5 rounded-xl border transition-all text-xs font-bold ${
                                                 templateSid === t.sid
@@ -200,52 +188,24 @@ export function WhatsAppModal({ lead, isOpen, onClose }: WhatsAppModalProps) {
                                             }`}
                                         >
                                             <div className="font-extrabold">{t.name}</div>
-                                            <div className="text-[10px] text-slate-400 mt-0.5 truncate">{t.sid}</div>
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="templateSid" className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Template SID (Content SID)</Label>
-                                <input
-                                    id="templateSid"
-                                    type="text"
-                                    placeholder="e.g. HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                    className="w-full p-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-700 text-sm"
-                                    value={templateSid}
-                                    onChange={(e) => setTemplateSid(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex flex-col gap-1">
-                                    <Label htmlFor="templateVars" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Template Variables (Optional)</Label>
-                                    <span className="text-[9px] font-medium text-slate-400 leading-none">Comma-separated values in order (e.g. John, Bali Package, June 1)</span>
+                            {templateSid && (
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Message Preview</Label>
+                                    <div className="p-4 rounded-2xl bg-emerald-50/30 border border-emerald-100 text-xs font-bold text-slate-700 leading-relaxed">
+                                        {(() => {
+                                            const selectedTemplate = approvedTemplates.find(t => t.sid === templateSid);
+                                            return selectedTemplate 
+                                                ? getPreviewMessage(selectedTemplate.body, lead.name) 
+                                                : '';
+                                        })()}
+                                    </div>
                                 </div>
-                                <input
-                                    id="templateVars"
-                                    type="text"
-                                    placeholder="e.g. John, Bali, June 1"
-                                    className="w-full p-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-700 text-sm"
-                                    value={templateVars}
-                                    onChange={(e) => setTemplateVars(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex flex-col gap-1">
-                                    <Label htmlFor="message" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message Preview / Database Log (Optional)</Label>
-                                    <span className="text-[9px] font-medium text-slate-400 leading-none">Write the template text for your records</span>
-                                </div>
-                                <Textarea
-                                    id="message"
-                                    placeholder="e.g. Hello John, your booking is confirmed..."
-                                    className="min-h-[100px] rounded-2xl border-slate-200 focus:ring-emerald-500 focus:border-emerald-500 font-bold text-slate-700"
-                                    value={message}
-                                    onChange={(e) => setMessage(e.target.value)}
-                                />
-                            </div>
+                            )}
                         </>
                     )}
                 </div>

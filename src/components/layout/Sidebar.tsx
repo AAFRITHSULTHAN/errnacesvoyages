@@ -24,8 +24,8 @@ export function Sidebar() {
 
     const NAV_ITEMS = [
         { label: t('dashboard'), icon: LayoutDashboard, href: '/' },
-        { label: t('pipeline'), icon: LayoutGrid, href: '/pipeline' },
         { label: t('leads'), icon: Users, href: '/leads' },
+        { label: t('pipeline'), icon: LayoutGrid, href: '/pipeline' },
         { label: t('tourPackages'), icon: Map, href: '/tours' },
         { label: t('whatsapp'), icon: MessageSquare, href: '/whatsapp' },
         { label: t('analytics'), icon: BarChart3, href: '/analytics' },

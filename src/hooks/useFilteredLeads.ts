@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useAppStore } from '@/store';
 
 /**
@@ -7,5 +8,5 @@ import { useAppStore } from '@/store';
  */
 export function useFilteredLeads() {
     const { leads } = useAppStore();
-    return leads;
+    return useMemo(() => leads.filter(l => l.source !== 'Staff'), [leads]);
 }

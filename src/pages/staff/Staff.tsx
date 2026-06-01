@@ -29,8 +29,8 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { StaffForm } from '@/components/staff/StaffForm';
-import { StaffProfile } from '@/components/staff/StaffProfile';
 import { useAppStore } from '@/store';
+import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import type { User, KPI } from '@/types';
 import { useI18n } from '@/i18n';
@@ -39,6 +39,7 @@ import { KPICards } from '@/components/dashboard/KPICards';
 
 export function Staff() {
     const { staff, addStaff, updateStaff, deleteStaff, fetchStaff, leads, fetchLeads } = useAppStore();
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -118,8 +119,7 @@ export function Staff() {
     };
 
     const handleViewProfile = (staff: User) => {
-        setSelectedStaff(staff);
-        setIsProfileOpen(true);
+        navigate(`/staff/${staff.id}`);
     };
 
     const handleSaveStaff = async (data: any) => {
@@ -354,11 +354,6 @@ export function Staff() {
                 </DialogContent>
             </Dialog>
 
-            <StaffProfile
-                staff={selectedStaff}
-                open={isProfileOpen}
-                onOpenChange={setIsProfileOpen}
-            />
         </div>
     );
 }
