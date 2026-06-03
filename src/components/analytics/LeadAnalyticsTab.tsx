@@ -27,15 +27,32 @@ export function LeadAnalyticsTab() {
 
     const analytics = useMemo(() => {
         // Filter leads by period
-        const periodStart = startOfDay(subDays(new Date(), parseInt(days)));
+        const daysNum = days !== 'all' ? parseInt(days) : null;
+        const periodStart = daysNum ? startOfDay(subDays(new Date(), daysNum)) : null;
+        const prevPeriodStart = daysNum ? startOfDay(subDays(new Date(), daysNum * 2)) : null;
+
         const filteredLeads = leads.filter(lead => {
+            if (days === 'all') return true;
             if (!lead.created_at) return true;
+            if (!periodStart) return true;
             try {
                 return isAfter(parseISO(lead.created_at), periodStart);
             } catch (e) {
                 return true;
             }
         });
+
+        const prevFilteredLeads = days !== 'all' && prevPeriodStart && periodStart
+            ? leads.filter(lead => {
+                if (!lead.created_at) return false;
+                try {
+                    const leadDate = parseISO(lead.created_at);
+                    return isAfter(leadDate, prevPeriodStart) && !isAfter(leadDate, periodStart);
+                } catch (e) {
+                    return false;
+                }
+            })
+            : [];
 
         const totalLeads = filteredLeads.length;
         const convertedLeads = filteredLeads.filter(l => l.status === 'converted').length;
@@ -44,11 +61,31 @@ export function LeadAnalyticsTab() {
             .filter(l => l.status === 'converted')
             .reduce((sum, l) => sum + (l.budget || 0), 0);
 
+        const prevTotalLeads = prevFilteredLeads.length;
+        const prevConvertedLeads = prevFilteredLeads.filter(l => l.status === 'converted').length;
+        const prevConversionRate = prevTotalLeads > 0 ? (prevConvertedLeads / prevTotalLeads) * 100 : 0;
+        const prevTotalRevenue = prevFilteredLeads
+            .filter(l => l.status === 'converted')
+            .reduce((sum, l) => sum + (l.budget || 0), 0);
+
+        const getChange = (curr: number, prev: number) => {
+            if (days === 'all') return undefined;
+            if (prev === 0) return curr > 0 ? 100 : 0;
+            return Math.round(((curr - prev) / prev) * 100);
+        };
+
+        const getRateChange = (currRateStr: string, prevRate: number) => {
+            if (days === 'all') return undefined;
+            const currRate = parseFloat(currRateStr);
+            if (prevRate === 0) return currRate > 0 ? 100 : 0;
+            return Math.round(((currRate - prevRate) / prevRate) * 100);
+        };
+
         const kpis = [
-            { label: 'Total Leads', value: totalLeads.toString(), icon: 'Users', change: 12 },
-            { label: 'Converted', value: convertedLeads.toString(), icon: 'UserCheck', change: 8 },
-            { label: 'Conversion Rate', value: `${conversionRate}%`, icon: 'TrendingUp', change: -2 },
-            { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign', change: 15 },
+            { label: 'Total Leads', value: totalLeads.toString(), icon: 'Users', change: getChange(totalLeads, prevTotalLeads) },
+            { label: 'Converted', value: convertedLeads.toString(), icon: 'UserCheck', change: getChange(convertedLeads, prevConvertedLeads) },
+            { label: 'Conversion Rate', value: `${conversionRate}%`, icon: 'TrendingUp', change: getRateChange(conversionRate, prevConversionRate) },
+            { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign', change: getChange(totalRevenue, prevTotalRevenue) },
         ];
 
         const statusCounts = filteredLeads.reduce((acc, lead) => {
@@ -56,12 +93,19 @@ export function LeadAnalyticsTab() {
             return acc;
         }, {} as Record<string, number>);
 
+        // Calculate funnel data cumulatively
+        const converted = statusCounts['converted'] || 0;
+        const proposal = (statusCounts['proposal_sent'] || 0) + converted;
+        const qualified = (statusCounts['qualified'] || 0) + proposal;
+        const contacted = (statusCounts['contacted'] || 0) + qualified;
+        const newLeads = (statusCounts['new'] || 0) + (statusCounts['lost'] || 0) + contacted;
+
         const funnelData = [
-            { name: 'New', value: statusCounts['new'] || 0 },
-            { name: 'Contacted', value: statusCounts['contacted'] || 0 },
-            { name: 'Qualified', value: statusCounts['qualified'] || 0 },
-            { name: 'Proposal', value: statusCounts['proposal_sent'] || 0 },
-            { name: 'Converted', value: statusCounts['converted'] || 0 },
+            { name: 'New', value: newLeads },
+            { name: 'Contacted', value: contacted },
+            { name: 'Qualified', value: qualified },
+            { name: 'Proposal', value: proposal },
+            { name: 'Converted', value: converted },
         ];
 
         const statusData = [
@@ -100,6 +144,7 @@ export function LeadAnalyticsTab() {
                             <SelectItem value="7">Last 7 days</SelectItem>
                             <SelectItem value="30">Last 30 days</SelectItem>
                             <SelectItem value="90">Last 90 days</SelectItem>
+                            <SelectItem value="all">All Time</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -239,7 +284,7 @@ export function LeadAnalyticsTab() {
                             <CardContent className="pb-2">
                                 <div className="h-[200px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={analytics.funnelData} layout="vertical" barSize={24} margin={{ left: 10, right: 60, top: 5, bottom: 5 }}>
+                                        <BarChart data={analytics.funnelData} layout="vertical" barSize={24} margin={{ left: 10, right: 90, top: 5, bottom: 5 }}>
                                             <defs>
                                                 <linearGradient id="funnelGradient" x1="0" y1="0" x2="1" y2="0">
                                                     <stop offset="0%" stopColor="#6366f1" />

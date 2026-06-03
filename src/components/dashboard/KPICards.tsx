@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import type { KPI } from '@/types';
-import { Users, Map, DollarSign, TrendingUp, UserCheck, Calendar } from 'lucide-react';
+import { Users, Map, DollarSign, TrendingUp, UserCheck, Calendar, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
 import { Link } from 'react-router-dom';
@@ -11,7 +11,8 @@ const ICON_MAP: Record<string, { icon: any; color: string; bgColor: string; shad
     DollarSign: { icon: DollarSign, color: 'text-amber-600', bgColor: 'bg-amber-50', shadowColor: 'shadow-amber-200' },
     TrendingUp: { icon: TrendingUp, color: 'text-indigo-600', bgColor: 'bg-indigo-50', shadowColor: 'shadow-indigo-200' },
     UserCheck: { icon: UserCheck, color: 'text-rose-600', bgColor: 'bg-rose-50', shadowColor: 'shadow-rose-200' },
-    Calendar: { icon: Calendar, color: 'text-orange-600', bgColor: 'bg-orange-50', shadowColor: 'shadow-orange-200' }
+    Calendar: { icon: Calendar, color: 'text-orange-600', bgColor: 'bg-orange-50', shadowColor: 'shadow-orange-200' },
+    MessageSquare: { icon: MessageSquare, color: 'text-emerald-600', bgColor: 'bg-emerald-50', shadowColor: 'shadow-emerald-200' }
 };
 
 interface KPICardsProps {
