@@ -23,7 +23,7 @@ import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 
 export function LeadAnalyticsTab() {
     const { leads } = { leads: useFilteredLeads() };
-    const [days, setDays] = useState('30');
+    const [days, setDays] = useState('all');
 
     const analytics = useMemo(() => {
         // Filter leads by period
@@ -93,19 +93,12 @@ export function LeadAnalyticsTab() {
             return acc;
         }, {} as Record<string, number>);
 
-        // Calculate funnel data cumulatively
-        const converted = statusCounts['converted'] || 0;
-        const proposal = (statusCounts['proposal_sent'] || 0) + converted;
-        const qualified = (statusCounts['qualified'] || 0) + proposal;
-        const contacted = (statusCounts['contacted'] || 0) + qualified;
-        const newLeads = (statusCounts['new'] || 0) + (statusCounts['lost'] || 0) + contacted;
-
         const funnelData = [
-            { name: 'New', value: newLeads },
-            { name: 'Contacted', value: contacted },
-            { name: 'Qualified', value: qualified },
-            { name: 'Proposal', value: proposal },
-            { name: 'Converted', value: converted },
+            { name: 'New', value: statusCounts['new'] || 0 },
+            { name: 'Contacted', value: statusCounts['contacted'] || 0 },
+            { name: 'Qualified', value: statusCounts['qualified'] || 0 },
+            { name: 'Proposal', value: statusCounts['proposal_sent'] || 0 },
+            { name: 'Converted', value: statusCounts['converted'] || 0 },
         ];
 
         const statusData = [

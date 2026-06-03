@@ -4,16 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDateRangePicker } from '@/components/dashboard/DateRangePicker';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import type { DateRange } from 'react-day-picker';
-import { subDays, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 
 const LEAD_SOURCE_COLORS = ['#E50914', '#a855f7', '#f59e0b', '#10b981', '#ef4444', '#6366f1'];
 
 export function ReportsTab() {
     const { leads } = useAppStore();
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 30),
-        to: new Date(),
-    });
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
     const analytics = useMemo(() => {
         // Filter leads by date range

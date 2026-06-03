@@ -45,7 +45,7 @@ export function CalendarDateRangePicker({
                                 format(date.from, "LLL dd, y")
                             )
                         ) : (
-                            <span>Pick a date</span>
+                            <span>All Time</span>
                         )}
                     </Button>
                 </PopoverTrigger>
