@@ -32,8 +32,9 @@ import type { Lead } from '@/types';
 import { KPICards } from '@/components/dashboard/KPICards';
 import { useI18n } from '@/i18n';
 import { useFilteredLeads } from '@/hooks/useFilteredLeads';
+import { getLeadRevenue } from '@/lib/utils';
 export function Pipeline() {
-    const { fetchLeads, addLead, updateLead } = useAppStore();
+    const { fetchLeads, addLead, updateLead, tours } = useAppStore();
     const leads = useFilteredLeads();
     const [activeId, setActiveId] = useState<string | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -60,7 +61,7 @@ export function Pipeline() {
         const conversionRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0.0';
         const totalRevenue = leads
             .filter(l => l.status === 'converted')
-            .reduce((sum, l) => sum + (l.budget || 0), 0);
+            .reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
 
         return [
             { label: t('totalLeads'), value: totalLeads.toString(), icon: 'Users' },

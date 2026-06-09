@@ -83,7 +83,7 @@ export function Login() {
                                     id="email"
                                     type="email"
                                     placeholder="your@email.com"
-                                    className="pl-10.5 h-11 bg-white/60 border-slate-200 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 rounded-xl font-semibold text-slate-700 text-xs transition-all placeholder:text-slate-400 placeholder:font-medium shadow-sm"
+                                    className="pl-10 h-11 bg-white/60 border-slate-200 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 rounded-xl font-semibold text-slate-700 text-xs transition-all placeholder:text-slate-400 placeholder:font-medium shadow-sm"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -103,7 +103,7 @@ export function Login() {
                                     id="password"
                                     type={showPassword ? "text" : "password"}
                                     placeholder="Enter your password"
-                                    className="pl-10.5 pr-10.5 h-11 bg-white/60 border-slate-200 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 rounded-xl font-semibold text-slate-700 text-xs transition-all placeholder:text-slate-400 placeholder:font-medium shadow-sm"
+                                    className="pl-10 pr-10 h-11 bg-white/60 border-slate-200 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 rounded-xl font-semibold text-slate-700 text-xs transition-all placeholder:text-slate-400 placeholder:font-medium shadow-sm"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required

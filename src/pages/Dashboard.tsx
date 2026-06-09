@@ -18,6 +18,7 @@ import {
 import { LeadForm } from '@/components/leads/LeadForm';
 import { v4 as uuidv4 } from 'uuid';
 import { useI18n } from '@/i18n';
+import { getLeadRevenue } from '@/lib/utils';
 
 export function Dashboard() {
     const { tours, addLead } = useAppStore();
@@ -45,10 +46,10 @@ export function Dashboard() {
             ? ((convertedLeads / totalLeads) * 100).toFixed(1)
             : '0.0';
 
-        // Calculate Revenue (sum of budget for converted leads)
+        // Calculate Revenue (sum of budget for converted leads, falling back to package price if 0/null)
         const totalRevenue = leads
             .filter(l => l.status === 'converted')
-            .reduce((sum, l) => sum + (l.budget || 0), 0);
+            .reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
 
         // Pending follow-ups (leads in 'contacted' or 'proposal_sent' status)
         const pendingFollowUps = leads.filter(l =>
@@ -85,7 +86,7 @@ export function Dashboard() {
             .filter(l => l.status === 'converted' && l.tour_interest)
             .reduce((acc, lead) => {
                 const tourName = lead.tour_interest || 'Custom';
-                acc[tourName] = (acc[tourName] || 0) + (lead.budget || 0);
+                acc[tourName] = (acc[tourName] || 0) + getLeadRevenue(lead, tours);
                 return acc;
             }, {} as Record<string, number>);
 

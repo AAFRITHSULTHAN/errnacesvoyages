@@ -20,9 +20,12 @@ const CustomBar = (props: any) => {
 };
 
 import { useFilteredLeads } from '@/hooks/useFilteredLeads';
+import { useAppStore } from '@/store';
+import { getLeadRevenue } from '@/lib/utils';
 
 export function LeadAnalyticsTab() {
     const { leads } = { leads: useFilteredLeads() };
+    const { tours } = useAppStore();
     const [days, setDays] = useState('all');
 
     const analytics = useMemo(() => {
@@ -59,14 +62,14 @@ export function LeadAnalyticsTab() {
         const conversionRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0.0';
         const totalRevenue = filteredLeads
             .filter(l => l.status === 'converted')
-            .reduce((sum, l) => sum + (l.budget || 0), 0);
+            .reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
 
         const prevTotalLeads = prevFilteredLeads.length;
         const prevConvertedLeads = prevFilteredLeads.filter(l => l.status === 'converted').length;
         const prevConversionRate = prevTotalLeads > 0 ? (prevConvertedLeads / prevTotalLeads) * 100 : 0;
         const prevTotalRevenue = prevFilteredLeads
             .filter(l => l.status === 'converted')
-            .reduce((sum, l) => sum + (l.budget || 0), 0);
+            .reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
 
         const getChange = (curr: number, prev: number) => {
             if (days === 'all') return undefined;

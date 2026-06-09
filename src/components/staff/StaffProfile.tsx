@@ -30,6 +30,7 @@ import {
 import { useAppStore } from '@/store';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getLeadRevenue } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/Toast';
 
@@ -41,6 +42,7 @@ interface StaffProfileProps {
 
 export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
     const leads = useAppStore(state => state.leads);
+    const tours = useAppStore(state => state.tours);
     const sendWhatsApp = useAppStore(state => state.sendWhatsApp);
     const fetchLeads = useAppStore(state => state.fetchLeads);
 
@@ -217,7 +219,7 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
         const convertedLeads = staffLeads.filter(l => l.status === 'converted');
 
         const dealsClosed = convertedLeads.length;
-        const totalRevenue = convertedLeads.reduce((sum, l) => sum + (l.budget || 0), 0);
+        const totalRevenue = convertedLeads.reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
         const conversion = totalLeads > 0 ? Math.round((dealsClosed / totalLeads) * 100) : 0;
 
         return { dealsClosed, totalRevenue, conversion, totalLeads, staffLeads };

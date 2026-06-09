@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useFilteredLeads } from '@/hooks/useFilteredLeads';
+import { useAppStore } from '@/store';
+import { getLeadRevenue } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDateRangePicker } from '@/components/dashboard/DateRangePicker';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
@@ -10,6 +12,7 @@ const LEAD_SOURCE_COLORS = ['#E50914', '#a855f7', '#f59e0b', '#10b981', '#ef4444
 
 export function ReportsTab() {
     const leads = useFilteredLeads();
+    const { tours } = useAppStore();
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
     const analytics = useMemo(() => {
@@ -51,7 +54,7 @@ export function ReportsTab() {
                 const date = new Date(lead.created_at);
                 const monthIndex = date.getMonth();
                 if (monthIndex >= 0 && monthIndex < 12) {
-                    monthlyRevenueData[monthIndex].revenue += (lead.budget || 0);
+                    monthlyRevenueData[monthIndex].revenue += getLeadRevenue(lead, tours);
                 }
             }
         });

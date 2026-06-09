@@ -167,7 +167,7 @@ async function syncMessageToSupabase(msg, leadId) {
                 // Fetch active tour packages
                 const { data: tourPackages, error: toursErr } = await supabase
                     .from('tours')
-                    .select('id, title')
+                    .select('id, title, price')
                     .eq('status', 'active')
                     .order('title', { ascending: true });
 
@@ -212,6 +212,7 @@ async function syncMessageToSupabase(msg, leadId) {
                         const updatePayload = {
                             selected_package: selectedPackage.title,
                             tour_interest: selectedPackage.title,
+                            budget: selectedPackage.price,
                             status: 'qualified',
                             selection_timestamp: new Date().toISOString()
                         };

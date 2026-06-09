@@ -31,6 +31,7 @@ import {
 import { StaffForm } from '@/components/staff/StaffForm';
 import { useAppStore } from '@/store';
 import { useFilteredLeads } from '@/hooks/useFilteredLeads';
+import { getLeadRevenue } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import type { User, KPI } from '@/types';
@@ -39,7 +40,7 @@ import { KPICards } from '@/components/dashboard/KPICards';
 
 
 export function Staff() {
-    const { staff, addStaff, updateStaff, deleteStaff, fetchStaff, fetchLeads } = useAppStore();
+    const { staff, addStaff, updateStaff, deleteStaff, fetchStaff, fetchLeads, fetchTours, tours } = useAppStore();
     const leads = useFilteredLeads();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
@@ -50,14 +51,15 @@ export function Staff() {
     useEffect(() => {
         fetchStaff();
         fetchLeads();
-    }, [fetchStaff, fetchLeads]);
+        fetchTours();
+    }, [fetchStaff, fetchLeads, fetchTours]);
 
     // Calculate staff sales data & sort top performers SaaS style
     const staffSalesData = useMemo(() => {
         return staff.map(member => {
             const allAssigned = leads.filter(l => l.assigned_staff_id === member.id);
             const convertedLeads = allAssigned.filter(l => l.status === 'converted');
-            const salesRevenue = convertedLeads.reduce((sum, l) => sum + (l.budget || 0), 0);
+            const salesRevenue = convertedLeads.reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
             const conversionRate = allAssigned.length > 0
                 ? Math.round((convertedLeads.length / allAssigned.length) * 100)
                 : 0;

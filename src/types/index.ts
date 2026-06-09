@@ -18,6 +18,8 @@ export type Lead = {
     status: 'new' | 'contacted' | 'qualified' | 'proposal_sent' | 'converted' | 'lost';
     source: string;
     tour_interest?: string;
+    selected_package?: string;
+    selection_timestamp?: string;
     budget?: number;
     travel_date?: string;
     assigned_staff_id?: string;

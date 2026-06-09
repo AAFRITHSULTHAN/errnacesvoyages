@@ -39,6 +39,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/Toast';
 import { useI18n } from '@/i18n';
+import { getLeadRevenue } from '@/lib/utils';
 import {
     ResponsiveContainer,
     PieChart,
@@ -68,8 +69,10 @@ export function StaffDetails() {
     const {
         staff,
         leads,
+        tours,
         fetchStaff,
         fetchLeads,
+        fetchTours,
         updateStaff,
         deleteStaff,
         sendWhatsApp
@@ -87,7 +90,8 @@ export function StaffDetails() {
     useEffect(() => {
         fetchStaff();
         fetchLeads();
-    }, [fetchStaff, fetchLeads]);
+        fetchTours();
+    }, [fetchStaff, fetchLeads, fetchTours]);
 
     // Find current staff member
     const member = useMemo(() => {
@@ -286,7 +290,7 @@ export function StaffDetails() {
         const convertedLeads = staffLeads.filter(l => l.status === 'converted');
 
         const dealsClosed = convertedLeads.length;
-        const totalRevenue = convertedLeads.reduce((sum, l) => sum + (l.budget || 0), 0);
+        const totalRevenue = convertedLeads.reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
         const conversion = totalLeads > 0 ? Math.round((dealsClosed / totalLeads) * 100) : 0;
 
         return { dealsClosed, totalRevenue, conversion, totalLeads, staffLeads };
@@ -314,11 +318,12 @@ export function StaffDetails() {
         
         let cumulative = 0;
         const data = converted.map(l => {
-            cumulative += (l.budget || 0);
+            const revenueAmt = getLeadRevenue(l, tours);
+            cumulative += revenueAmt;
             return {
                 date: format(parseISO(l.created_at), 'MMM d'),
                 revenue: cumulative,
-                amount: l.budget || 0
+                amount: revenueAmt
             };
         });
 

@@ -19,9 +19,10 @@ import { useI18n } from '@/i18n';
 import { WhatsAppModal } from '@/components/leads/WhatsAppModal';
 
 import { useFilteredLeads } from '@/hooks/useFilteredLeads';
+import { getLeadRevenue } from '@/lib/utils';
 
 export function Leads() {
-    const { fetchLeads, addLead, updateLead, deleteLead } = useAppStore();
+    const { fetchLeads, addLead, updateLead, deleteLead, tours } = useAppStore();
     const leads = useFilteredLeads();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | undefined>(undefined);
@@ -39,7 +40,7 @@ export function Leads() {
         const conversionRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0.0';
         const totalRevenue = leads
             .filter(l => l.status === 'converted')
-            .reduce((sum, l) => sum + (l.budget || 0), 0);
+            .reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
 
         return [
             { label: t('totalLeads'), value: totalLeads.toString(), icon: 'Users' },

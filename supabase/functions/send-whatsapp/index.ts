@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -239,6 +240,8 @@ serve(async (req: Request) => {
         // If a package was already selected (e.g. they only sent package number first previously)
         if (conversation.selected_package) {
           const userName = rawBody
+          const selectedPkg = tourPackages?.find((p: any) => p.title === conversation.selected_package)
+          const packagePrice = selectedPkg ? selectedPkg.price : null
 
           // Update lead details
           await supabase
@@ -248,6 +251,7 @@ serve(async (req: Request) => {
               status: 'qualified',
               selected_package: conversation.selected_package,
               tour_interest: conversation.selected_package,
+              budget: packagePrice,
               selection_timestamp: new Date().toISOString()
             })
             .eq('id', matchingLead.id)
@@ -313,6 +317,7 @@ serve(async (req: Request) => {
               status: 'qualified',
               selected_package: selectedPackage.title,
               tour_interest: selectedPackage.title,
+              budget: selectedPackage.price,
               selection_timestamp: new Date().toISOString()
             })
             .eq('id', matchingLead.id)
@@ -471,6 +476,7 @@ serve(async (req: Request) => {
             status: 'qualified',
             selected_package: selectedPackage.title,
             tour_interest: selectedPackage.title,
+            budget: selectedPackage.price,
             selection_timestamp: new Date().toISOString()
           })
           .eq('id', matchingLead.id)
