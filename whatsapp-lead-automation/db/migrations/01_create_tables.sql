@@ -10,7 +10,7 @@ DROP TABLE IF EXISTS public.tour_packages CASCADE;
 CREATE TABLE IF NOT EXISTS public.whatsapp_conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     phone TEXT UNIQUE NOT NULL,
-    stage TEXT NOT NULL CHECK (stage IN ('package_selection', 'completed')),
+    stage TEXT NOT NULL CHECK (stage IN ('collect_name', 'package_selection', 'completed')),
     selected_package TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

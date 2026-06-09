@@ -44,8 +44,8 @@ export class WebhookController {
             
             if (!conversation || isResetRequest) {
                 if (isResetRequest && conversation) {
-                    console.log(`🔄 Resetting conversation state for ${cleanPhone} to menu`);
-                    await supabaseService.updateConversation(cleanPhone, 'package_selection', null);
+                    console.log(`🔄 Resetting conversation state for ${cleanPhone} to collect_name`);
+                    await supabaseService.updateConversation(cleanPhone, 'collect_name', null);
                 } else {
                     console.log(`🆕 Creating new conversation state for ${cleanPhone}`);
                     conversation = await supabaseService.createConversation(cleanPhone);
@@ -60,18 +60,117 @@ export class WebhookController {
                     console.log(`👤 Matching existing CRM lead found: ID ${lead.id}`);
                 }
 
-                // 3. Send package selection prompt
-                const packageListString = activePackages
-                    .map((pkg, idx) => `${idx + 1}. ${pkg.name}`)
-                    .join('\n');
-
-                const replyMessage = `Thank you for contacting us.\n\nPlease select one of our tour packages:\n\n${packageListString}\n\nReply with the package number.`;
+                // 3. Send package selection prompt along with welcome and name request
+                let welcomeText = "Thank you for contacting Errances Voyages.\n\nTo get started, please reply with your *Full Name* and the *Tour Package Number* you are interested in:\n\n";
+                if (activePackages && activePackages.length > 0) {
+                    const listStr = activePackages.map((p: any, idx: number) => `${idx + 1}. ${p.name}`).join('\n');
+                    welcomeText += `*Active Tour Packages:*\n${listStr}\n\nExample reply: John Doe - 2`;
+                } else {
+                    welcomeText += "We currently do not have any active packages available. Please reply with your *Full Name* so our travel consultant can contact you.";
+                }
                 
-                await twilioService.sendWhatsAppMessage(cleanPhone, replyMessage);
+                await twilioService.sendWhatsAppMessage(cleanPhone, welcomeText);
                 return res.status(200).send('<Response></Response>');
             }
 
-            // B. Existing User - Stage: package_selection
+            // B. Existing User - Stage: collect_name
+            if (conversation.stage === 'collect_name') {
+                let lead = await supabaseService.getLeadByPhone(cleanPhone);
+                if (!lead) {
+                    lead = await supabaseService.createLead(cleanPhone);
+                }
+
+                // If a package was already selected (e.g. they only sent package number first previously)
+                if (conversation.selected_package) {
+                    const userName = rawBody;
+
+                    // Update lead details
+                    await supabaseService.updateLeadSelectionAndName(lead.id, userName, conversation.selected_package);
+
+                    // Mark conversation completed
+                    await supabaseService.updateConversation(cleanPhone, 'completed', conversation.selected_package);
+
+                    // Send confirmation
+                    const confirmationText = `Thank you, ${userName}!\n\nWe have received your interest for ${conversation.selected_package}.\n\nOur travel consultant will contact you shortly.`;
+                    await twilioService.sendWhatsAppMessage(cleanPhone, confirmationText);
+                    return res.status(200).send('<Response></Response>');
+                }
+
+                // Otherwise, parse the reply to extract name and package number
+                let parsedName = rawBody;
+                let selectedIndex = -1;
+
+                const numbers = rawBody.match(/\d+/g);
+                if (numbers && activePackages && activePackages.length > 0) {
+                    for (const numStr of numbers) {
+                        const val = parseInt(numStr, 10);
+                        if (val >= 1 && val <= activePackages.length) {
+                            selectedIndex = val - 1;
+                            // Remove the number and common separators from the name
+                            const numRegex = new RegExp(`\\s*[-–—,\\.]*\\s*${numStr}\\s*|\\s*${numStr}\\s*[-–—,\\.]*\\s*`);
+                            parsedName = rawBody.replace(numRegex, ' ').replace(/\s+/g, ' ').trim();
+                            break;
+                        }
+                    }
+                }
+
+                const hasValidPackage = selectedIndex >= 0 && activePackages && selectedIndex < activePackages.length;
+                const hasValidName = parsedName.length >= 2;
+
+                if (hasValidName && hasValidPackage) {
+                    const selectedPackage = activePackages[selectedIndex];
+
+                    // Update lead details
+                    await supabaseService.updateLeadSelectionAndName(lead.id, parsedName, selectedPackage.name);
+
+                    // Mark conversation completed
+                    await supabaseService.updateConversation(cleanPhone, 'completed', selectedPackage.name);
+
+                    // Send Confirmation Message
+                    const confirmationText = `Thank you, ${parsedName}!\n\nWe have received your interest for ${selectedPackage.name}.\n\nOur travel consultant will contact you shortly.`;
+                    await twilioService.sendWhatsAppMessage(cleanPhone, confirmationText);
+                } else if (hasValidName) {
+                    // Update lead's name
+                    await supabaseService.updateLeadName(lead.id, parsedName);
+
+                    // Move conversation tracking to package_selection stage
+                    await supabaseService.updateConversation(cleanPhone, 'package_selection', null);
+
+                    // Format and send Package Selection menu
+                    let selectMenuText = '';
+                    if (activePackages && activePackages.length > 0) {
+                        const listStr = activePackages.map((p: any, idx: number) => `${idx + 1}. ${p.name}`).join('\n');
+                        selectMenuText = `Thank you, ${parsedName}!\n\nPlease select one of our tour packages:\n\n${listStr}\n\nReply with the package number.`;
+                    } else {
+                        selectMenuText = `Thank you, ${parsedName}!\n\nWe currently do not have any active packages available. A travel consultant will contact you shortly.`;
+                    }
+
+                    await twilioService.sendWhatsAppMessage(cleanPhone, selectMenuText);
+                } else if (hasValidPackage) {
+                    const selectedPackage = activePackages[selectedIndex];
+
+                    // Save selected package in conversation stage
+                    await supabaseService.updateConversation(cleanPhone, 'collect_name', selectedPackage.name);
+
+                    const promptNameText = `Thank you!\n\nPlease reply with your *Full Name* to complete your request for ${selectedPackage.name}.`;
+                    await twilioService.sendWhatsAppMessage(cleanPhone, promptNameText);
+                } else {
+                    // Prompt for name and package again
+                    let errorPrompt = "We couldn't quite understand your message.\n\nPlease reply with your *Full Name* and the *Tour Package Number* you are interested in:\n\n";
+                    if (activePackages && activePackages.length > 0) {
+                        const listStr = activePackages.map((p: any, idx: number) => `${idx + 1}. ${p.name}`).join('\n');
+                        errorPrompt += `*Active Tour Packages:*\n${listStr}\n\nExample reply: John Doe - 2`;
+                    } else {
+                        errorPrompt += "Please reply with your *Full Name* so our travel consultant can contact you.";
+                    }
+
+                    await twilioService.sendWhatsAppMessage(cleanPhone, errorPrompt);
+                }
+
+                return res.status(200).send('<Response></Response>');
+            }
+
+            // C. Existing User - Stage: package_selection
             if (conversation.stage === 'package_selection') {
                 const selectedIndex = parseInt(rawBody, 10) - 1;
 

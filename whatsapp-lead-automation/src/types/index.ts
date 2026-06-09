@@ -1,4 +1,4 @@
-export type ConversationStage = 'package_selection' | 'completed';
+export type ConversationStage = 'collect_name' | 'package_selection' | 'completed';
 
 export interface TourPackage {
     id: string;

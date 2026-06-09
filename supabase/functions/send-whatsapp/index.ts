@@ -124,19 +124,19 @@ serve(async (req: Request) => {
       const isResetRequest = ['menu', 'restart', 'start'].includes(rawBody.toLowerCase())
 
       // -------------------------------------------------------------
-      // STATE 1: Welcome / Re-initiate Menu
+      // STATE 1: Welcome / Re-initiate Menu (Collect Name)
       // -------------------------------------------------------------
       if (!conversation || isResetRequest) {
-        // Create or reset conversation record
+        // Create or reset conversation record to collect_name
         if (conversation) {
           await supabase
             .from('whatsapp_conversations')
-            .update({ stage: 'package_selection', selected_package: null, updated_at: new Date().toISOString() })
+            .update({ stage: 'collect_name', selected_package: null, updated_at: new Date().toISOString() })
             .eq('phone', cleanPhone)
         } else {
           await supabase
             .from('whatsapp_conversations')
-            .insert({ phone: cleanPhone, stage: 'package_selection', updated_at: new Date().toISOString() })
+            .insert({ phone: cleanPhone, stage: 'collect_name', updated_at: new Date().toISOString() })
         }
 
         // Create or restore lead record
@@ -192,15 +192,14 @@ serve(async (req: Request) => {
           status: 'read'
         })
 
-        // Send Welcome Message with Tour Menu options
-        let welcomeText = ''
+        // Prompt for Name and Package
+        let welcomeText = "Thank you for contacting Errances Voyages.\n\nTo get started, please reply with your *Full Name* and the *Tour Package Number* you are interested in:\n\n"
         if (tourPackages && tourPackages.length > 0) {
           const listStr = tourPackages.map((p: any, idx: number) => `${idx + 1}. ${p.title}`).join('\n')
-          welcomeText = `Thank you for contacting us.\n\nPlease select one of our tour packages:\n\n${listStr}\n\nReply with the package number.`
+          welcomeText += `*Active Tour Packages:*\n${listStr}\n\nExample reply: John Doe - 2`
         } else {
-          welcomeText = "Thank you for contacting us. We currently do not have any active packages available. A travel consultant will contact you shortly."
+          welcomeText += "We currently do not have any active packages available. Please reply with your *Full Name* so our travel consultant can contact you."
         }
-
         await sendResponse(welcomeText)
 
         // Save bot welcome message to CRM logs
@@ -218,7 +217,207 @@ serve(async (req: Request) => {
       }
 
       // -------------------------------------------------------------
-      // STATE 2: Package Selection stage
+      // STATE 2: Collect Name Stage
+      // -------------------------------------------------------------
+      if (conversation.stage === 'collect_name') {
+        if (!matchingLead) {
+          const { data: fallbackLead } = await supabase
+            .from('leads')
+            .insert({ name: `WhatsApp (${cleanPhone})`, phone: cleanPhone, email: `${normalizedSearch}@whatsapp.crm`, source: 'WhatsApp', status: 'New Lead' })
+            .select().single()
+          matchingLead = fallbackLead
+        }
+
+        // Save incoming user message to CRM logs
+        await supabase.from('whatsapp_messages').insert({
+          lead_id: matchingLead.id,
+          sender: 'contact',
+          content: rawBody,
+          status: 'read'
+        })
+
+        // If a package was already selected (e.g. they only sent package number first previously)
+        if (conversation.selected_package) {
+          const userName = rawBody
+
+          // Update lead details
+          await supabase
+            .from('leads')
+            .update({
+              name: userName,
+              status: 'Interested',
+              selected_package: conversation.selected_package,
+              selection_timestamp: new Date().toISOString()
+            })
+            .eq('id', matchingLead.id)
+
+          // Mark conversation completed
+          await supabase
+            .from('whatsapp_conversations')
+            .update({
+              stage: 'completed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('phone', cleanPhone)
+
+          // Send confirmation
+          const confirmationText = `Thank you, ${userName}!\n\nWe have received your interest for ${conversation.selected_package}.\n\nOur travel consultant will contact you shortly.`
+          await sendResponse(confirmationText)
+
+          // Save bot confirmation message to CRM logs
+          await supabase.from('whatsapp_messages').insert({
+            lead_id: matchingLead.id,
+            sender: 'user',
+            content: confirmationText,
+            status: 'read'
+          })
+
+          return new Response('<Response></Response>', {
+            headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+            status: 200
+          })
+        }
+
+        // Otherwise, parse the reply to extract name and package number
+        let parsedName = rawBody
+        let selectedIndex = -1
+
+        const numbers = rawBody.match(/\d+/g)
+        if (numbers && tourPackages && tourPackages.length > 0) {
+          for (const numStr of numbers) {
+            const val = parseInt(numStr, 10)
+            if (val >= 1 && val <= tourPackages.length) {
+              selectedIndex = val - 1
+              // Remove the number and common separators from the name
+              const numRegex = new RegExp(`\\s*[-–—,\\.]*\\s*${numStr}\\s*|\\s*${numStr}\\s*[-–—,\\.]*\\s*`)
+              parsedName = rawBody.replace(numRegex, ' ').replace(/\s+/g, ' ').trim()
+              break
+            }
+          }
+        }
+
+        const hasValidPackage = selectedIndex >= 0 && tourPackages && selectedIndex < tourPackages.length
+        const hasValidName = parsedName.length >= 2
+
+        if (hasValidName && hasValidPackage) {
+          const selectedPackage = tourPackages[selectedIndex]
+
+          // Update lead details
+          await supabase
+            .from('leads')
+            .update({
+              name: parsedName,
+              status: 'Interested',
+              selected_package: selectedPackage.title,
+              selection_timestamp: new Date().toISOString()
+            })
+            .eq('id', matchingLead.id)
+
+          // Mark conversation completed
+          await supabase
+            .from('whatsapp_conversations')
+            .update({
+              stage: 'completed',
+              selected_package: selectedPackage.title,
+              updated_at: new Date().toISOString()
+            })
+            .eq('phone', cleanPhone)
+
+          // Send Confirmation Message
+          const confirmationText = `Thank you, ${parsedName}!\n\nWe have received your interest for ${selectedPackage.title}.\n\nOur travel consultant will contact you shortly.`
+          await sendResponse(confirmationText)
+
+          // Save bot confirmation message to CRM logs
+          await supabase.from('whatsapp_messages').insert({
+            lead_id: matchingLead.id,
+            sender: 'user',
+            content: confirmationText,
+            status: 'read'
+          })
+        } else if (hasValidName) {
+          // Update lead's name with their reply
+          await supabase
+            .from('leads')
+            .update({ name: parsedName })
+            .eq('id', matchingLead.id)
+
+          // Move conversation tracking to package_selection stage
+          await supabase
+            .from('whatsapp_conversations')
+            .update({
+              stage: 'package_selection',
+              updated_at: new Date().toISOString()
+            })
+            .eq('phone', cleanPhone)
+
+          // Format and send Package Selection menu
+          let selectMenuText = ''
+          if (tourPackages && tourPackages.length > 0) {
+            const listStr = tourPackages.map((p: any, idx: number) => `${idx + 1}. ${p.title}`).join('\n')
+            selectMenuText = `Thank you, ${parsedName}!\n\nPlease select one of our tour packages:\n\n${listStr}\n\nReply with the package number.`
+          } else {
+            selectMenuText = `Thank you, ${parsedName}!\n\nWe currently do not have any active packages available. A travel consultant will contact you shortly.`
+          }
+
+          await sendResponse(selectMenuText)
+
+          // Save bot welcome message to CRM logs
+          await supabase.from('whatsapp_messages').insert({
+            lead_id: matchingLead.id,
+            sender: 'user',
+            content: selectMenuText,
+            status: 'read'
+          })
+        } else if (hasValidPackage) {
+          const selectedPackage = tourPackages[selectedIndex]
+
+          // Save selected package in conversation stage
+          await supabase
+            .from('whatsapp_conversations')
+            .update({
+              selected_package: selectedPackage.title,
+              updated_at: new Date().toISOString()
+            })
+            .eq('phone', cleanPhone)
+
+          const promptNameText = `Thank you!\n\nPlease reply with your *Full Name* to complete your request for ${selectedPackage.title}.`
+          await sendResponse(promptNameText)
+
+          // Save bot welcome message to CRM logs
+          await supabase.from('whatsapp_messages').insert({
+            lead_id: matchingLead.id,
+            sender: 'user',
+            content: promptNameText,
+            status: 'read'
+          })
+        } else {
+          // Prompt for name and package again
+          let errorPrompt = "We couldn't quite understand your message.\n\nPlease reply with your *Full Name* and the *Tour Package Number* you are interested in:\n\n"
+          if (tourPackages && tourPackages.length > 0) {
+            const listStr = tourPackages.map((p: any, idx: number) => `${idx + 1}. ${p.title}`).join('\n')
+            errorPrompt += `*Active Tour Packages:*\n${listStr}\n\nExample reply: John Doe - 2`
+          } else {
+            errorPrompt += "Please reply with your *Full Name* so our travel consultant can contact you."
+          }
+
+          await sendResponse(errorPrompt)
+
+          await supabase.from('whatsapp_messages').insert({
+            lead_id: matchingLead.id,
+            sender: 'user',
+            content: errorPrompt,
+            status: 'read'
+          })
+        }
+
+        return new Response('<Response></Response>', {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+          status: 200
+        })
+      }
+
+      // -------------------------------------------------------------
+      // STATE 3: Package Selection stage
       // -------------------------------------------------------------
       if (conversation.stage === 'package_selection') {
         if (!matchingLead) {

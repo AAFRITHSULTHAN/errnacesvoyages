@@ -62,7 +62,7 @@ class SupabaseService {
             .from('whatsapp_conversations')
             .insert({
                 phone,
-                stage: 'package_selection',
+                stage: 'collect_name',
                 updated_at: new Date().toISOString()
             })
             .select()
@@ -178,6 +178,49 @@ class SupabaseService {
         if (error) {
             console.error(`Error updating lead tour package selection for ${leadId}:`, error);
             throw new Error(`Failed to update lead selection: ${error.message}`);
+        }
+
+        return data as Lead;
+    }
+
+    /**
+     * Update the lead's name
+     */
+    async updateLeadName(leadId: string, name: string): Promise<Lead> {
+        const { data, error } = await this.client
+            .from('leads')
+            .update({ name })
+            .eq('id', leadId)
+            .select()
+            .single();
+
+        if (error) {
+            console.error(`Error updating lead name for ${leadId}:`, error);
+            throw new Error(`Failed to update lead name: ${error.message}`);
+        }
+
+        return data as Lead;
+    }
+
+    /**
+     * Update both lead's name and package selection details
+     */
+    async updateLeadSelectionAndName(leadId: string, name: string, packageName: string): Promise<Lead> {
+        const { data, error } = await this.client
+            .from('leads')
+            .update({
+                name,
+                status: 'Interested',
+                selected_package: packageName,
+                selection_timestamp: new Date().toISOString()
+            })
+            .eq('id', leadId)
+            .select()
+            .single();
+
+        if (error) {
+            console.error(`Error updating lead selection and name for ${leadId}:`, error);
+            throw new Error(`Failed to update lead selection and name: ${error.message}`);
         }
 
         return data as Lead;
