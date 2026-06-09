@@ -19,17 +19,21 @@ class SupabaseService {
      */
     async getActiveTourPackages(): Promise<TourPackage[]> {
         const { data, error } = await this.client
-            .from('tour_packages')
-            .select('id, name, active')
-            .eq('active', true)
-            .order('name', { ascending: true });
+            .from('tours')
+            .select('id, title, status')
+            .eq('status', 'active')
+            .order('title', { ascending: true });
 
         if (error) {
             console.error('Error fetching active tour packages:', error);
             throw new Error(`Failed to fetch active tour packages: ${error.message}`);
         }
 
-        return data as TourPackage[];
+        return (data || []).map((pkg: any) => ({
+            id: pkg.id,
+            name: pkg.title,
+            active: pkg.status === 'active'
+        })) as TourPackage[];
     }
 
     /**

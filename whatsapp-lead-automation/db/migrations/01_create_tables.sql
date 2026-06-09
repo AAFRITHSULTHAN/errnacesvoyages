@@ -2,15 +2,11 @@
 -- SQL Migration: WhatsApp Lead Automation Tables and Schema Enhancements
 -- ============================================================================
 
--- 1. Create tour_packages Table
-CREATE TABLE IF NOT EXISTS public.tour_packages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- Note: The system utilizes the existing CRM 'tours' table for active packages.
+-- Run this to drop the temporary 'tour_packages' table if created:
+DROP TABLE IF EXISTS public.tour_packages CASCADE;
 
--- 2. Create whatsapp_conversations Table to Track Conversation State
+-- 1. Create whatsapp_conversations Table to Track Conversation State
 CREATE TABLE IF NOT EXISTS public.whatsapp_conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     phone TEXT UNIQUE NOT NULL,
@@ -20,28 +16,14 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_conversations (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 3. Add Columns to leads Table for Automations
+-- 2. Add Columns to leads Table for Automations
 ALTER TABLE public.leads 
     ADD COLUMN IF NOT EXISTS selected_package TEXT,
     ADD COLUMN IF NOT EXISTS selection_timestamp TIMESTAMPTZ;
 
--- 4. Enable Row Level Security (RLS) on New Tables
-ALTER TABLE public.tour_packages ENABLE ROW LEVEL SECURITY;
+-- 3. Enable Row Level Security (RLS) on whatsapp_conversations Table
 ALTER TABLE public.whatsapp_conversations ENABLE ROW LEVEL SECURITY;
 
--- 5. Create Policies Allowing Access to Service Role Key (Server Side Integration)
--- By default, enabling RLS restricts anonymous access but allows the service_role key to bypass.
--- If client access is ever needed, explicit policies can be added.
-CREATE POLICY "Allow service_role full access on tour_packages" ON public.tour_packages
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
-
+-- 4. Create Policies Allowing Access to Service Role Key (Server Side Integration)
 CREATE POLICY "Allow service_role full access on whatsapp_conversations" ON public.whatsapp_conversations
     FOR ALL TO service_role USING (true) WITH CHECK (true);
-
--- 6. Insert Sample Active Tour Packages for Testing
-INSERT INTO public.tour_packages (name, active) VALUES
-    ('French Riviera Explorer (7 Days)', true),
-    ('Paris & Loire Valley Escapade (5 Days)', true),
-    ('Swiss Alps & Italian Lakes Adventure (10 Days)', true),
-    ('Mediterranean Dream Cruise (8 Days)', true)
-ON CONFLICT DO NOTHING;

@@ -101,10 +101,10 @@ serve(async (req: Request) => {
 
       // Fetch active tour packages
       const { data: tourPackages, error: pkgError } = await supabase
-        .from('tour_packages')
+        .from('tours')
         .select('*')
-        .eq('active', true)
-        .order('name', { ascending: true })
+        .eq('status', 'active')
+        .order('title', { ascending: true })
 
       if (pkgError) {
         console.error('Error fetching tour packages:', pkgError)
@@ -195,7 +195,7 @@ serve(async (req: Request) => {
         // Send Welcome Message with Tour Menu options
         let welcomeText = ''
         if (tourPackages && tourPackages.length > 0) {
-          const listStr = tourPackages.map((p: any, idx: number) => `${idx + 1}. ${p.name}`).join('\n')
+          const listStr = tourPackages.map((p: any, idx: number) => `${idx + 1}. ${p.title}`).join('\n')
           welcomeText = `Thank you for contacting us.\n\nPlease select one of our tour packages:\n\n${listStr}\n\nReply with the package number.`
         } else {
           welcomeText = "Thank you for contacting us. We currently do not have any active packages available. A travel consultant will contact you shortly."
@@ -239,7 +239,7 @@ serve(async (req: Request) => {
 
         const selectedIndex = parseInt(rawBody, 10) - 1
         if (isNaN(selectedIndex) || !tourPackages || selectedIndex < 0 || selectedIndex >= tourPackages.length) {
-          const listStr = tourPackages?.map((p: any, idx: number) => `${idx + 1}. ${p.name}`).join('\n') || ''
+          const listStr = tourPackages?.map((p: any, idx: number) => `${idx + 1}. ${p.title}`).join('\n') || ''
           const invalidText = `Invalid selection. Please choose a valid tour package number:\n\n${listStr}\n\nReply with the package number.`
 
           await sendResponse(invalidText)
@@ -264,7 +264,7 @@ serve(async (req: Request) => {
           .from('leads')
           .update({
             status: 'Interested',
-            selected_package: selectedPackage.name,
+            selected_package: selectedPackage.title,
             selection_timestamp: new Date().toISOString()
           })
           .eq('id', matchingLead.id)
@@ -274,13 +274,13 @@ serve(async (req: Request) => {
           .from('whatsapp_conversations')
           .update({
             stage: 'completed',
-            selected_package: selectedPackage.name,
+            selected_package: selectedPackage.title,
             updated_at: new Date().toISOString()
           })
           .eq('phone', cleanPhone)
 
         // Send Confirmation Message
-        const confirmationText = `Thank you for choosing ${selectedPackage.name}.\n\nOur travel consultant will contact you shortly.`
+        const confirmationText = `Thank you for choosing ${selectedPackage.title}.\n\nOur travel consultant will contact you shortly.`
         
         await sendResponse(confirmationText)
 
