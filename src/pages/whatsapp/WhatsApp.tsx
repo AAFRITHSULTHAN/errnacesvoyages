@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/Toast';
 
 import { Search, MoreVertical, Paperclip, Send, Smile, CheckCheck, Check, AlertTriangle, Users, Loader2, X, Plus, RefreshCw, Edit, Trash2, Forward } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useAppStore } from '@/store';
@@ -47,6 +48,8 @@ export function WhatsApp() {
     const updateWhatsAppMessage = useAppStore(state => state.updateWhatsAppMessage);
     const staff = useAppStore(state => state.staff);
     const fetchStaff = useAppStore(state => state.fetchStaff);
+    const updateLead = useAppStore(state => state.updateLead);
+    const deleteLead = useAppStore(state => state.deleteLead);
     const location = useLocation();
 
     const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -83,6 +86,16 @@ export function WhatsApp() {
     const [isEditGroupOpen, setIsEditGroupOpen] = useState(false);
     const [editGroupName, setEditGroupName] = useState('');
     const [editGroupMembers, setEditGroupMembers] = useState<string[]>([]);
+
+    // Contact edit and delete states
+    const [isEditContactOpen, setIsEditContactOpen] = useState(false);
+    const [editContactName, setEditContactName] = useState('');
+    const [editContactPhone, setEditContactPhone] = useState('');
+    const [editContactEmail, setEditContactEmail] = useState('');
+    const [isUpdatingContact, setIsUpdatingContact] = useState(false);
+
+    const [isDeleteContactOpen, setIsDeleteContactOpen] = useState(false);
+    const [isDeletingContact, setIsDeletingContact] = useState(false);
 
     // Set edit inputs when selected group chat changes
     useEffect(() => {
@@ -171,6 +184,77 @@ export function WhatsApp() {
         } catch (err: any) {
             console.error('Failed to update group:', err);
             toast.error('Failed to update group: ' + err.message);
+        }
+    };
+
+    const handleUpdateContact = async () => {
+        if (!selectedContact) return;
+        if (!editContactName.trim() || !editContactPhone.trim()) {
+            toast.error("Name and phone number are required.");
+            return;
+        }
+
+        setIsUpdatingContact(true);
+        try {
+            const targetLeadIds = (selectedContact as any).leadIds || [selectedContact.id];
+
+            // Update all duplicate leads associated with this contact's phone
+            await Promise.all(targetLeadIds.map((leadId: string) => 
+                updateLead(leadId, {
+                    name: editContactName,
+                    phone: editContactPhone,
+                    email: editContactEmail
+                })
+            ));
+
+            toast.success('Contact updated successfully');
+            setIsEditContactOpen(false);
+            await fetchLeads();
+
+            // Update local selection with new details
+            setSelectedContact(prev => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    name: editContactName,
+                    phone: editContactPhone,
+                    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(editContactName)}`,
+                } as any;
+            });
+        } catch (err: any) {
+            console.error('Failed to update contact:', err);
+            toast.error('Failed to update contact: ' + err.message);
+        } finally {
+            setIsUpdatingContact(false);
+        }
+    };
+
+    const handleDeleteContact = async () => {
+        if (!selectedContact) return;
+        setIsDeletingContact(true);
+        try {
+            const targetLeadIds = (selectedContact as any).leadIds || [selectedContact.id];
+
+            // Delete (soft-delete) all matching leads
+            await Promise.all(targetLeadIds.map((leadId: string) => deleteLead(leadId)));
+
+            toast.success(
+                (selectedContact as any).source === 'WhatsApp Group' 
+                    ? 'Group list deleted successfully' 
+                    : 'Contact deleted successfully'
+            );
+            setIsDeleteContactOpen(false);
+
+            // Fetch fresh leads list
+            await fetchLeads();
+
+            // Deselect contact
+            setSelectedContact(null);
+        } catch (err: any) {
+            console.error('Failed to delete contact:', err);
+            toast.error('Failed to delete contact: ' + err.message);
+        } finally {
+            setIsDeletingContact(false);
         }
     };
 
@@ -1323,9 +1407,58 @@ export function WhatsApp() {
                                         <Search className="h-5 w-5" />
                                     </Button>
                                 )}
-                                <Button variant="ghost" size="icon" className="text-slate-500 hover:bg-slate-50 rounded-xl">
-                                    <MoreVertical className="h-5 w-5" />
-                                </Button>
+                                
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="text-slate-500 hover:bg-slate-50 rounded-xl">
+                                            <MoreVertical className="h-5 w-5" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="bg-white rounded-xl shadow-lg border border-slate-200 p-1 min-w-[150px] z-50">
+                                        {(selectedContact as any).source === 'WhatsApp Group' ? (
+                                            <>
+                                                <DropdownMenuItem 
+                                                    onClick={() => setIsEditGroupOpen(true)}
+                                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer font-bold text-xs"
+                                                >
+                                                    <Users className="h-4 w-4 text-indigo-500" />
+                                                    <span>Manage Members</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem 
+                                                    onClick={() => setIsDeleteContactOpen(true)}
+                                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-700 cursor-pointer font-bold text-xs"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    <span>Delete Group</span>
+                                                </DropdownMenuItem>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <DropdownMenuItem 
+                                                    onClick={() => {
+                                                        setEditContactName(selectedContact.name);
+                                                        setEditContactPhone(selectedContact.phone);
+                                                        // Fetch the primary lead to populate email
+                                                        const primaryLead = leads.find(l => l.id === selectedContact.id);
+                                                        setEditContactEmail(primaryLead?.email || '');
+                                                        setIsEditContactOpen(true);
+                                                    }}
+                                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer font-bold text-xs"
+                                                >
+                                                    <Edit className="h-4 w-4 text-indigo-500" />
+                                                    <span>Edit / Rename</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem 
+                                                    onClick={() => setIsDeleteContactOpen(true)}
+                                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-700 cursor-pointer font-bold text-xs"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    <span>Delete Contact</span>
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                         </div>
 
@@ -1791,6 +1924,102 @@ export function WhatsApp() {
                             className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold px-5"
                         >
                             Forward ({selectedContactsForForward.length})
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit / Rename Contact Dialog */}
+            <Dialog open={isEditContactOpen} onOpenChange={setIsEditContactOpen}>
+                <DialogContent className="sm:max-w-[460px] bg-white rounded-2xl border-slate-200 shadow-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black text-slate-800 uppercase tracking-tight">Edit Contact Details</DialogTitle>
+                        <DialogDescription className="text-slate-500 font-medium text-xs">
+                            Update contact name, phone, or email. This will synchronize across all records for this contact.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-3">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-contact-name" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Full Name</Label>
+                            <Input
+                                id="edit-contact-name"
+                                placeholder="Contact name..."
+                                className="rounded-xl border-slate-200 focus-visible:ring-indigo-500 font-bold text-slate-700 h-10 text-xs"
+                                value={editContactName}
+                                onChange={(e) => setEditContactName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-contact-phone" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Phone Number</Label>
+                            <Input
+                                id="edit-contact-phone"
+                                placeholder="Phone number..."
+                                className="rounded-xl border-slate-200 focus-visible:ring-indigo-500 font-bold text-slate-700 h-10 text-xs"
+                                value={editContactPhone}
+                                onChange={(e) => setEditContactPhone(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-contact-email" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Address (Optional)</Label>
+                            <Input
+                                id="edit-contact-email"
+                                type="email"
+                                placeholder="Email address..."
+                                className="rounded-xl border-slate-200 focus-visible:ring-indigo-500 font-bold text-slate-700 h-10 text-xs"
+                                value={editContactEmail}
+                                onChange={(e) => setEditContactEmail(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="ghost" onClick={() => setIsEditContactOpen(false)} className="rounded-xl font-bold text-slate-500 hover:bg-slate-100">Cancel</Button>
+                        <Button 
+                            disabled={!editContactName.trim() || !editContactPhone.trim() || isUpdatingContact} 
+                            onClick={handleUpdateContact}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold px-5"
+                        >
+                            {isUpdatingContact ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                                    Saving...
+                                </>
+                            ) : (
+                                'Save Changes'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Contact Dialog */}
+            <Dialog open={isDeleteContactOpen} onOpenChange={setIsDeleteContactOpen}>
+                <DialogContent className="sm:max-w-[420px] bg-white rounded-2xl border-slate-200 shadow-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                            <AlertTriangle className="h-5.5 w-5.5 text-red-500 animate-bounce" />
+                            <span>Confirm Deletion</span>
+                        </DialogTitle>
+                        <DialogDescription className="text-slate-500 font-medium text-xs leading-relaxed">
+                            Are you sure you want to delete <strong>{selectedContact?.name}</strong>?
+                            <br />
+                            This contact will be removed from your active list, but all past WhatsApp chat history will be fully preserved in the database.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 mt-4">
+                        <Button variant="ghost" onClick={() => setIsDeleteContactOpen(false)} className="rounded-xl font-bold text-slate-500 hover:bg-slate-100">Cancel</Button>
+                        <Button 
+                            disabled={isDeletingContact} 
+                            onClick={handleDeleteContact}
+                            className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold px-5"
+                        >
+                            {isDeletingContact ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete'
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
