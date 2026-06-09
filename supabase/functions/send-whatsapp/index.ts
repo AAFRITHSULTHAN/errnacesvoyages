@@ -78,7 +78,24 @@ serve(async (req: Request) => {
       const TWILIO_WHATSAPP_NUMBER = Deno.env.get('TWILIO_WHATSAPP_NUMBER') || 'whatsapp:+17752555600'
 
       const sendResponse = async (text: string) => {
-        return await sendTwilioWhatsApp(cleanPhone, text, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER)
+        try {
+          return await sendTwilioWhatsApp(cleanPhone, text, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER)
+        } catch (err: any) {
+          console.error('sendResponse failed:', err)
+          if (matchingLead) {
+            try {
+              await supabase.from('whatsapp_messages').insert({
+                lead_id: matchingLead.id,
+                sender: 'user',
+                content: `⚠️ Twilio Error: ${err.message || String(err)}. (If using Twilio Sandbox, verify if the contact has joined the sandbox by sending the sandbox keyword first)`,
+                status: 'read'
+              })
+            } catch (dbErr) {
+              console.error('Failed to log Twilio error to database:', dbErr)
+            }
+          }
+          throw err;
+        }
       }
 
       // Fetch all leads to do normalized phone matching
@@ -148,34 +165,17 @@ serve(async (req: Request) => {
               phone: cleanPhone,
               email: `${normalizedSearch}@whatsapp.crm`,
               source: 'WhatsApp',
-              status: 'New Lead',
-              is_deleted: false
+              status: 'new'
             })
             .select()
             .single()
 
-          if (createError && (createError.message?.includes('is_deleted') || createError.code === 'PGRST100')) {
-            const fallbackResult = await supabase
-              .from('leads')
-              .insert({
-                name: `WhatsApp (${cleanPhone})`,
-                phone: cleanPhone,
-                email: `${normalizedSearch}@whatsapp.crm`,
-                source: 'WhatsApp',
-                status: 'New Lead'
-              })
-              .select()
-              .single()
-            newLead = fallbackResult.data
-            createError = fallbackResult.error
-          }
-
           if (createError) throw createError
           matchingLead = newLead
-        } else if (matchingLead.is_deleted) {
+        } else if (matchingLead.notes === '[DELETED]') {
           const { data: restoredLead, error: restoreError } = await supabase
             .from('leads')
-            .update({ is_deleted: false })
+            .update({ notes: null })
             .eq('id', matchingLead.id)
             .select()
             .single()
@@ -193,7 +193,7 @@ serve(async (req: Request) => {
         })
 
         // Prompt for Name and Package
-        let welcomeText = "Thank you for contacting Errances Voyages.\n\nTo get started, please reply with your *Full Name* and the *Tour Package Number* you are interested in:\n\n"
+        let welcomeText = "Thank you for contacting Errances Voyages. 🌟\n\nCould you please reply with your *Full Name* and select the *Tour Package Number* you are interested in from the list below:\n\n"
         if (tourPackages && tourPackages.length > 0) {
           const listStr = tourPackages.map((p: any, idx: number) => `${idx + 1}. ${p.title}`).join('\n')
           welcomeText += `*Active Tour Packages:*\n${listStr}\n\nExample reply: John Doe - 2`
@@ -223,7 +223,7 @@ serve(async (req: Request) => {
         if (!matchingLead) {
           const { data: fallbackLead } = await supabase
             .from('leads')
-            .insert({ name: `WhatsApp (${cleanPhone})`, phone: cleanPhone, email: `${normalizedSearch}@whatsapp.crm`, source: 'WhatsApp', status: 'New Lead' })
+            .insert({ name: `WhatsApp (${cleanPhone})`, phone: cleanPhone, email: `${normalizedSearch}@whatsapp.crm`, source: 'WhatsApp', status: 'new' })
             .select().single()
           matchingLead = fallbackLead
         }
@@ -245,8 +245,9 @@ serve(async (req: Request) => {
             .from('leads')
             .update({
               name: userName,
-              status: 'Interested',
+              status: 'qualified',
               selected_package: conversation.selected_package,
+              tour_interest: conversation.selected_package,
               selection_timestamp: new Date().toISOString()
             })
             .eq('id', matchingLead.id)
@@ -297,7 +298,9 @@ serve(async (req: Request) => {
         }
 
         const hasValidPackage = selectedIndex >= 0 && tourPackages && selectedIndex < tourPackages.length
-        const hasValidName = parsedName.length >= 2
+        const GREETINGS = ['hi', 'hii', 'hiii', 'hello', 'hey', 'heyy', 'hola', 'start', 'menu', 'restart']
+        const isGreeting = GREETINGS.includes(parsedName.toLowerCase().trim())
+        const hasValidName = parsedName.length >= 2 && !isGreeting
 
         if (hasValidName && hasValidPackage) {
           const selectedPackage = tourPackages[selectedIndex]
@@ -307,8 +310,9 @@ serve(async (req: Request) => {
             .from('leads')
             .update({
               name: parsedName,
-              status: 'Interested',
+              status: 'qualified',
               selected_package: selectedPackage.title,
+              tour_interest: selectedPackage.title,
               selection_timestamp: new Date().toISOString()
             })
             .eq('id', matchingLead.id)
@@ -354,9 +358,11 @@ serve(async (req: Request) => {
           let selectMenuText = ''
           if (tourPackages && tourPackages.length > 0) {
             const listStr = tourPackages.map((p: any, idx: number) => `${idx + 1}. ${p.title}`).join('\n')
-            selectMenuText = `Thank you, ${parsedName}!\n\nPlease select one of our tour packages:\n\n${listStr}\n\nReply with the package number.`
+            const greetingName = (parsedName && !parsedName.startsWith('WhatsApp (')) ? `, ${parsedName}` : ''
+            selectMenuText = `Thank you${greetingName}!\n\nPlease select one of our tour packages:\n\n${listStr}\n\nReply with the package number.`
           } else {
-            selectMenuText = `Thank you, ${parsedName}!\n\nWe currently do not have any active packages available. A travel consultant will contact you shortly.`
+            const greetingName = (parsedName && !parsedName.startsWith('WhatsApp (')) ? `, ${parsedName}` : ''
+            selectMenuText = `Thank you${greetingName}!\n\nWe currently do not have any active packages available. A travel consultant will contact you shortly.`
           }
 
           await sendResponse(selectMenuText)
@@ -423,7 +429,7 @@ serve(async (req: Request) => {
         if (!matchingLead) {
           const { data: fallbackLead } = await supabase
             .from('leads')
-            .insert({ name: `WhatsApp (${cleanPhone})`, phone: cleanPhone, email: `${normalizedSearch}@whatsapp.crm`, source: 'WhatsApp', status: 'New Lead' })
+            .insert({ name: `WhatsApp (${cleanPhone})`, phone: cleanPhone, email: `${normalizedSearch}@whatsapp.crm`, source: 'WhatsApp', status: 'new' })
             .select().single()
           matchingLead = fallbackLead
         }
@@ -462,8 +468,9 @@ serve(async (req: Request) => {
         await supabase
           .from('leads')
           .update({
-            status: 'Interested',
+            status: 'qualified',
             selected_package: selectedPackage.title,
+            tour_interest: selectedPackage.title,
             selection_timestamp: new Date().toISOString()
           })
           .eq('id', matchingLead.id)
@@ -528,9 +535,73 @@ serve(async (req: Request) => {
 
       const { data: leads } = await supabase.from('leads').select('*')
       const { data: messages } = await supabase.from('whatsapp_messages').select('*')
+      const { data: conversations } = await supabase.from('whatsapp_conversations').select('*')
+
+      // TEST: Try inserting a test conversation with 'collect_name' stage to verify constraints
+      const testPhone = '+99999999999'
+      const insertResult = await supabase
+        .from('whatsapp_conversations')
+        .insert({ phone: testPhone, stage: 'collect_name', updated_at: new Date().toISOString() })
+        .select()
+      
+      let testInsertError = null
+      if (insertResult.error) {
+        testInsertError = insertResult.error.message || String(insertResult.error)
+      } else {
+        // Clean up test insert if it succeeded
+        await supabase.from('whatsapp_conversations').delete().eq('phone', testPhone)
+      }
 
       return new Response(
-        JSON.stringify({ leads, messages }),
+        JSON.stringify({ 
+          leads, 
+          messages, 
+          conversations,
+          test_insert_success: !insertResult.error, 
+          test_insert_error: testInsertError,
+          twilio_account_sid_defined: !!Deno.env.get('TWILIO_ACCOUNT_SID'),
+          twilio_auth_token_defined: !!Deno.env.get('TWILIO_AUTH_TOKEN'),
+          twilio_whatsapp_number: Deno.env.get('TWILIO_WHATSAPP_NUMBER') || 'whatsapp:+17752555600'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+
+    if (body.action === 'reset_phone') {
+      const { phone } = body
+      if (!phone) {
+        throw new Error('Missing phone for reset_phone action')
+      }
+
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+      // Delete conversation state
+      await supabase.from('whatsapp_conversations').delete().eq('phone', phone)
+      
+      // Fetch and delete matching leads
+      const { data: leads } = await supabase.from('leads').select('*')
+      const targetLeads = leads?.filter((l: any) => {
+        if (!l.phone) return false
+        const cleanLPhone = l.phone.replace(/\D/g, '')
+        const cleanTarget = phone.replace(/\D/g, '')
+        return cleanLPhone === cleanTarget || cleanLPhone.endsWith(cleanTarget) || cleanTarget.endsWith(cleanLPhone)
+      })
+
+      if (targetLeads && targetLeads.length > 0) {
+        const leadIds = targetLeads.map((l: any) => l.id)
+        // Delete messages
+        await supabase.from('whatsapp_messages').delete().in('lead_id', leadIds)
+        // Delete leads
+        await supabase.from('leads').delete().in('id', leadIds)
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
@@ -548,15 +619,30 @@ serve(async (req: Request) => {
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
       const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-      // Soft delete the lead by setting is_deleted = true
-      // This preserves associated messages due to the leads row staying intact
+      // Fetch lead to get the phone number for conversation cleanup
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('phone')
+        .eq('id', leadId)
+        .maybeSingle()
+
+      if (lead && lead.phone) {
+        const cleanPhone = lead.phone.replace('whatsapp:', '').trim()
+        // Delete conversation tracking state
+        await supabase
+          .from('whatsapp_conversations')
+          .delete()
+          .eq('phone', cleanPhone)
+      }
+
+      // Hard delete the lead (cascades to whatsapp_messages table)
       const { error: leadError } = await supabase
         .from('leads')
-        .update({ is_deleted: true })
+        .delete()
         .eq('id', leadId)
 
       if (leadError) {
-        console.error('Error soft deleting lead in Edge Function:', leadError)
+        console.error('Error hard deleting lead in Edge Function:', leadError)
         throw leadError
       }
 

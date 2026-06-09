@@ -128,6 +128,19 @@ class SupabaseService {
                    cleanTarget.endsWith(cleanLeadPhone);
         });
 
+        if (match && match.notes === '[DELETED]') {
+            console.log(`[Soft-Delete] Restoring lead ${match.id} on incoming message`);
+            const { data: restored, error: restoreErr } = await this.client
+                .from('leads')
+                .update({ notes: null })
+                .eq('id', match.id)
+                .select()
+                .single();
+            if (!restoreErr && restored) {
+                return restored as Lead;
+            }
+        }
+
         return match ? (match as Lead) : null;
     }
 
@@ -142,7 +155,7 @@ class SupabaseService {
             phone: phone,
             email: `${cleanNumber}@whatsapp.crm`,
             source: 'WhatsApp',
-            status: 'New Lead',
+            status: 'new',
             created_at: new Date().toISOString()
         };
 
@@ -167,8 +180,9 @@ class SupabaseService {
         const { data, error } = await this.client
             .from('leads')
             .update({
-                status: 'Interested',
+                status: 'qualified',
                 selected_package: packageName,
+                tour_interest: packageName,
                 selection_timestamp: new Date().toISOString()
             })
             .eq('id', leadId)
@@ -210,8 +224,9 @@ class SupabaseService {
             .from('leads')
             .update({
                 name,
-                status: 'Interested',
+                status: 'qualified',
                 selected_package: packageName,
+                tour_interest: packageName,
                 selection_timestamp: new Date().toISOString()
             })
             .eq('id', leadId)

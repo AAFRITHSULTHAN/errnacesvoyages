@@ -90,7 +90,8 @@ export function LeadDetails() {
     // Normalize phone helper
     const normalizePhone = (phone?: string) => {
         if (!phone) return '';
-        return phone.replace(/\D/g, '');
+        const digits = phone.replace(/\D/g, '');
+        return digits.length >= 10 ? digits.slice(-10) : digits;
     };
 
     // Find all lead IDs sharing the same phone number for message consolidation

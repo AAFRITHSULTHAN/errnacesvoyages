@@ -61,7 +61,7 @@ export class WebhookController {
                 }
 
                 // 3. Send package selection prompt along with welcome and name request
-                let welcomeText = "Thank you for contacting Errances Voyages.\n\nTo get started, please reply with your *Full Name* and the *Tour Package Number* you are interested in:\n\n";
+                let welcomeText = "Thank you for contacting Errances Voyages. 🌟\n\nCould you please reply with your *Full Name* and select the *Tour Package Number* you are interested in from the list below:\n\n";
                 if (activePackages && activePackages.length > 0) {
                     const listStr = activePackages.map((p: any, idx: number) => `${idx + 1}. ${p.name}`).join('\n');
                     welcomeText += `*Active Tour Packages:*\n${listStr}\n\nExample reply: John Doe - 2`;
@@ -115,7 +115,9 @@ export class WebhookController {
                 }
 
                 const hasValidPackage = selectedIndex >= 0 && activePackages && selectedIndex < activePackages.length;
-                const hasValidName = parsedName.length >= 2;
+                const GREETINGS = ['hi', 'hii', 'hiii', 'hello', 'hey', 'heyy', 'hola', 'start', 'menu', 'restart', 'good morning', 'good afternoon', 'good evening', 'yo', 'hi there', 'hello there', 'greeting', 'greetings'];
+                const isGreeting = GREETINGS.includes(parsedName.toLowerCase().trim());
+                const hasValidName = parsedName.length >= 2 && !isGreeting;
 
                 if (hasValidName && hasValidPackage) {
                     const selectedPackage = activePackages[selectedIndex];
@@ -140,9 +142,11 @@ export class WebhookController {
                     let selectMenuText = '';
                     if (activePackages && activePackages.length > 0) {
                         const listStr = activePackages.map((p: any, idx: number) => `${idx + 1}. ${p.name}`).join('\n');
-                        selectMenuText = `Thank you, ${parsedName}!\n\nPlease select one of our tour packages:\n\n${listStr}\n\nReply with the package number.`;
+                        const greetingName = (parsedName && !parsedName.startsWith('WhatsApp (')) ? `, ${parsedName}` : '';
+                        selectMenuText = `Thank you${greetingName}!\n\nPlease select one of our tour packages:\n\n${listStr}\n\nReply with the package number.`;
                     } else {
-                        selectMenuText = `Thank you, ${parsedName}!\n\nWe currently do not have any active packages available. A travel consultant will contact you shortly.`;
+                        const greetingName = (parsedName && !parsedName.startsWith('WhatsApp (')) ? `, ${parsedName}` : '';
+                        selectMenuText = `Thank you${greetingName}!\n\nWe currently do not have any active packages available. A travel consultant will contact you shortly.`;
                     }
 
                     await twilioService.sendWhatsAppMessage(cleanPhone, selectMenuText);

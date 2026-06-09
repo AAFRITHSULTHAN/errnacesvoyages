@@ -45,7 +45,7 @@ function cleanJidPhone(jid) {
     return jid.split('@')[0];
 }
 
-async function syncContactToSupabase(jid, name, isGroup) {
+async function syncContactToSupabase(jid, name, isGroup, isLive = false) {
     const cleanPhone = cleanJidPhone(jid);
     const normalizedSearch = cleanPhone.replace(/\D/g, '');
     
@@ -68,15 +68,27 @@ async function syncContactToSupabase(jid, name, isGroup) {
     });
 
     if (matchingLead) {
-        // If the matching lead was soft-deleted, restore it!
-        if (matchingLead.is_deleted) {
-            console.log(`Restoring soft-deleted lead for contact: ${matchingLead.name}`);
+        // If the matching lead was soft-deleted, restore it only on a live message!
+        if (matchingLead.notes === '[DELETED]' && isLive) {
+            console.log(`Restoring soft-deleted lead for contact on live message: ${matchingLead.name}`);
             const { error: restoreError } = await supabase
                 .from('leads')
-                .update({ is_deleted: false })
+                .update({ notes: null })
                 .eq('id', matchingLead.id);
             if (restoreError) {
                 console.error(`Failed to restore lead:`, restoreError.message);
+            }
+        }
+
+        // If the lead name is the default "WhatsApp (...)" format and we received a better name, update it!
+        if (name && (matchingLead.name.startsWith('WhatsApp (') || matchingLead.name.startsWith('WhatsApp Lead ('))) {
+            console.log(`Updating default contact name for ${cleanPhone} from "${matchingLead.name}" to "${name}"`);
+            const { error: updateNameError } = await supabase
+                .from('leads')
+                .update({ name: name })
+                .eq('id', matchingLead.id);
+            if (updateNameError) {
+                console.error(`Failed to update default lead name:`, updateNameError.message);
             }
         }
         return matchingLead.id;
@@ -84,7 +96,7 @@ async function syncContactToSupabase(jid, name, isGroup) {
         // Create new lead using deterministic UUID
         const id = jidToUuid(jid);
         console.log(`Syncing new contact: ${name || cleanPhone} (${jid})`);
-        let { error } = await supabase
+        const { error } = await supabase
             .from('leads')
             .insert({
                 id: id,
@@ -93,24 +105,8 @@ async function syncContactToSupabase(jid, name, isGroup) {
                 email: isGroup ? `group-${cleanPhone}@whatsapp.group` : `${cleanPhone}@whatsapp.crm`,
                 source: isGroup ? 'WhatsApp Group' : 'WhatsApp Web',
                 status: isGroup ? 'converted' : 'new',
-                created_at: new Date().toISOString(),
-                is_deleted: false
+                created_at: new Date().toISOString()
             });
-        if (error && (error.message?.includes('is_deleted') || error.code === 'PGRST100')) {
-            console.warn(`Local WhatsApp Server: is_deleted column missing, inserting without it`);
-            const fallbackResult = await supabase
-                .from('leads')
-                .insert({
-                    id: id,
-                    name: name || (isGroup ? 'Unnamed Group' : `WhatsApp (${cleanPhone})`),
-                    phone: isGroup ? `group-${cleanPhone}` : `+${cleanPhone}`,
-                    email: isGroup ? `group-${cleanPhone}@whatsapp.group` : `${cleanPhone}@whatsapp.crm`,
-                    source: isGroup ? 'WhatsApp Group' : 'WhatsApp Web',
-                    status: isGroup ? 'converted' : 'new',
-                    created_at: new Date().toISOString()
-                });
-            error = fallbackResult.error;
-        }
         if (error) {
             console.error(`Failed to create lead for ${jid}:`, error.message);
         }
@@ -152,6 +148,92 @@ async function syncMessageToSupabase(msg, leadId) {
             });
         if (error) {
             console.error(`Failed to save message:`, error.message);
+        }
+    }
+
+    // Parse name and tour package from incoming contact messages (not groups)
+    const remoteJid = msg.key.remoteJid || '';
+    const isGroup = remoteJid.endsWith('@g.us');
+
+    if (!isUser && !isGroup && messageContent.trim()) {
+        try {
+            const { data: lead, error: leadErr } = await supabase
+                .from('leads')
+                .select('name, selected_package, tour_interest')
+                .eq('id', leadId)
+                .maybeSingle();
+
+            if (!leadErr && lead) {
+                // Fetch active tour packages
+                const { data: tourPackages, error: toursErr } = await supabase
+                    .from('tours')
+                    .select('id, title')
+                    .eq('status', 'active')
+                    .order('title', { ascending: true });
+
+                if (!toursErr && tourPackages && tourPackages.length > 0) {
+                    const rawBody = messageContent.trim();
+                    let parsedName = rawBody;
+                    let selectedPackage = null;
+
+                    // A. Try parsing package by index number (e.g. "John Doe - 2")
+                    const numbers = rawBody.match(/\d+/g);
+                    if (numbers) {
+                        for (const numStr of numbers) {
+                            const val = parseInt(numStr, 10);
+                            if (val >= 1 && val <= tourPackages.length) {
+                                selectedPackage = tourPackages[val - 1];
+                                const numRegex = new RegExp(`\\s*[-–—,\\.]*\\s*${numStr}\\s*|\\s*${numStr}\\s*[-–—,\\.]*\\s*`);
+                                parsedName = rawBody.replace(numRegex, ' ').replace(/\s+/g, ' ').trim();
+                                break;
+                            }
+                        }
+                    }
+
+                    // B. Try parsing package by title matching (e.g. "John Doe - Dubai Package")
+                    if (!selectedPackage) {
+                        for (const pkg of tourPackages) {
+                            const titleEscaped = pkg.title.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                            const titleRegex = new RegExp(`\\b${titleEscaped}\\b`, 'i');
+                            if (titleRegex.test(rawBody)) {
+                                selectedPackage = pkg;
+                                const replaceRegex = new RegExp(`\\s*[-–—,\\.]*\\s*${titleEscaped}\\s*|\\s*${titleEscaped}\\s*[-–—,\\.]*\\s*`, 'i');
+                                parsedName = rawBody.replace(replaceRegex, ' ').replace(/\s+/g, ' ').trim();
+                                break;
+                            }
+                        }
+                    }
+
+                    const GREETINGS = ['hi', 'hii', 'hiii', 'hello', 'hey', 'heyy', 'hola', 'start', 'menu', 'restart', 'good morning', 'good afternoon', 'good evening'];
+                    const isGreeting = GREETINGS.includes(parsedName.toLowerCase().trim());
+                    const hasValidName = parsedName.length >= 2 && !isGreeting;
+
+                    if (selectedPackage) {
+                        const updatePayload = {
+                            selected_package: selectedPackage.title,
+                            tour_interest: selectedPackage.title,
+                            status: 'qualified',
+                            selection_timestamp: new Date().toISOString()
+                        };
+
+                        if (hasValidName && (lead.name.startsWith('WhatsApp (') || lead.name.startsWith('WhatsApp Lead ('))) {
+                            updatePayload.name = parsedName;
+                        }
+
+                        console.log(`[Parser] Updating lead ${leadId}: name="${updatePayload.name || lead.name}", package="${selectedPackage.title}"`);
+                        const { error: updateErr } = await supabase
+                            .from('leads')
+                            .update(updatePayload)
+                            .eq('id', leadId);
+                        
+                        if (updateErr) {
+                            console.error('[Parser] Failed to update lead details:', updateErr.message);
+                        }
+                    }
+                }
+            }
+        } catch (parseErr) {
+            console.error('[Parser] Error parsing incoming message details:', parseErr);
         }
     }
 }
@@ -201,7 +283,7 @@ async function startWhatsApp() {
         if (chats) {
             for (const chat of chats) {
                 const isGroup = chat.id.endsWith('@g.us');
-                await syncContactToSupabase(chat.id, chat.name || chat.subject, isGroup);
+                await syncContactToSupabase(chat.id, chat.name || chat.subject, isGroup, false);
             }
         }
 
@@ -209,7 +291,7 @@ async function startWhatsApp() {
         if (messages) {
             for (const msg of messages) {
                 if (msg.key?.remoteJid) {
-                    const leadId = await syncContactToSupabase(msg.key.remoteJid, null, msg.key.remoteJid.endsWith('@g.us'));
+                    const leadId = await syncContactToSupabase(msg.key.remoteJid, msg.pushName || null, msg.key.remoteJid.endsWith('@g.us'), false);
                     if (leadId) {
                         await syncMessageToSupabase(msg, leadId);
                     }
@@ -228,7 +310,7 @@ async function startWhatsApp() {
             const isGroup = jid.endsWith('@g.us');
             
             // Sync contact first and get correct leadId
-            const leadId = await syncContactToSupabase(jid, null, isGroup);
+            const leadId = await syncContactToSupabase(jid, msg.pushName || null, isGroup, true);
             
             // Sync live message
             if (leadId) {

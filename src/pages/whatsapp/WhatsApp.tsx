@@ -676,7 +676,8 @@ export function WhatsApp() {
 
     // Normalize phone helper
     const normalizePhone = (phone: string) => {
-        return phone.replace(/\D/g, '');
+        const digits = phone.replace(/\D/g, '');
+        return digits.length >= 10 ? digits.slice(-10) : digits;
     };
 
     // Group leads by normalized phone number
@@ -1138,10 +1139,81 @@ export function WhatsApp() {
                                                 {format(contact.lastMessageTime, 'h:mm a')}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between items-center">
+                                        <div className="flex justify-between items-center relative group/msg">
                                             <p className="text-xs text-slate-500 truncate flex-1 mr-2 font-medium">
                                                 {contact.lastMessage}
                                             </p>
+                                            {!isBroadcastMode && (
+                                                <div className="opacity-0 group-hover/msg:opacity-100 focus-within:opacity-100 transition-opacity absolute right-0 bg-gradient-to-l from-slate-50 hover:from-slate-100 pl-4 h-full flex items-center">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button 
+                                                                className="text-slate-400 hover:text-slate-600 p-0.5 rounded-lg hover:bg-slate-200/50"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <MoreVertical className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="bg-white rounded-xl shadow-lg border border-slate-200 p-1 min-w-[130px] z-50">
+                                                            {contact.source === 'WhatsApp Group' ? (
+                                                                <>
+                                                                    <DropdownMenuItem 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedContact(contact);
+                                                                            setIsEditGroupOpen(true);
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer font-bold text-[11px]"
+                                                                    >
+                                                                        <Users className="h-3.5 w-3.5 text-indigo-500" />
+                                                                        <span>Manage Members</span>
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedContact(contact);
+                                                                            setIsDeleteContactOpen(true);
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-700 cursor-pointer font-bold text-[11px]"
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                        <span>Delete Group</span>
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <DropdownMenuItem 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedContact(contact);
+                                                                            setEditContactName(contact.name);
+                                                                            setEditContactPhone(contact.phone);
+                                                                            const primaryLead = leads.find(l => l.id === contact.id);
+                                                                            setEditContactEmail(primaryLead?.email || '');
+                                                                            setIsEditContactOpen(true);
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer font-bold text-[11px]"
+                                                                    >
+                                                                        <Edit className="h-3.5 w-3.5 text-indigo-500" />
+                                                                        <span>Edit / Rename</span>
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedContact(contact);
+                                                                            setIsDeleteContactOpen(true);
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-700 cursor-pointer font-bold text-[11px]"
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                        <span>Delete Contact</span>
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </button>

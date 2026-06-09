@@ -13,29 +13,17 @@ export async function getLeads() {
         client = anonClient;
     }
 
-    // Try querying with is_deleted filter
-    let { data, error } = await client
+    const { data, error } = await client
         .from('leads')
         .select('*')
-        .or('is_deleted.is.null,is_deleted.eq.false')
         .order('created_at', { ascending: false });
-
-    // Fallback if the is_deleted column doesn't exist yet in the database
-    if (error && (error.code === 'PGRST100' || error.message?.includes('is_deleted') || (error as any).details?.includes('is_deleted'))) {
-        console.warn('API: leads.is_deleted column not found, falling back to standard query');
-        const fallbackResult = await client
-            .from('leads')
-            .select('*')
-            .order('created_at', { ascending: false });
-        data = fallbackResult.data;
-        error = fallbackResult.error;
-    }
 
     if (error) {
         console.error('API: getLeads error:', error);
         throw error;
     }
-    return data as Lead[];
+    const allLeads = data as Lead[];
+    return allLeads.filter(l => l.notes !== '[DELETED]');
 }
 
 export async function createLead(lead: Partial<Lead>) {
@@ -49,7 +37,7 @@ export async function createLead(lead: Partial<Lead>) {
             
             if (existingLeads) {
                 const matchingDeletedLead = existingLeads.find(l => {
-                    if (!l.phone || !l.is_deleted) return false;
+                    if (!l.phone || l.notes !== '[DELETED]') return false;
                     const cleanExistingPhone = l.phone.replace(/\D/g, '');
                     return cleanExistingPhone === cleanPhone || 
                            cleanExistingPhone.endsWith(cleanPhone) || 
@@ -62,7 +50,7 @@ export async function createLead(lead: Partial<Lead>) {
                         .from('leads')
                         .update({
                             ...lead,
-                            is_deleted: false,
+                            notes: null,
                             created_at: new Date().toISOString() // update timestamp to bring it to top
                         })
                         .eq('id', matchingDeletedLead.id)
@@ -77,22 +65,10 @@ export async function createLead(lead: Partial<Lead>) {
         }
     }
 
-    // Try inserting with is_deleted field
-    let { data, error } = await supabase
+    const { data, error } = await supabase
         .from('leads')
-        .insert([{ ...lead, is_deleted: false }])
+        .insert([lead])
         .select();
-
-    // Fallback if is_deleted column doesn't exist
-    if (error && (error.code === 'PGRST100' || error.message?.includes('is_deleted') || (error as any).details?.includes('is_deleted'))) {
-        console.warn('API: leads.is_deleted column not found, inserting without it');
-        const fallbackResult = await supabase
-            .from('leads')
-            .insert([lead])
-            .select();
-        data = fallbackResult.data;
-        error = fallbackResult.error;
-    }
 
     if (error) throw error;
     return data?.[0] as Lead;
@@ -111,12 +87,29 @@ export async function updateLead(id: string, updates: Partial<Lead>) {
 }
 
 export async function deleteLead(id: string) {
-    const { data, error } = await supabase.functions.invoke('send-whatsapp', {
-        body: { action: 'delete_lead', leadId: id },
-    });
+    // 1. Fetch the lead's phone number first so we can delete their conversation state
+    const { data: lead } = await supabase
+        .from('leads')
+        .select('phone')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (lead?.phone) {
+        const cleanPhone = lead.phone.replace('whatsapp:', '').trim();
+        // 2. Delete conversation tracking state from whatsapp_conversations table
+        await supabase
+            .from('whatsapp_conversations')
+            .delete()
+            .eq('phone', cleanPhone);
+    }
+
+    // 3. Soft delete the lead from leads table by setting notes to '[DELETED]'
+    const { error } = await supabase
+        .from('leads')
+        .update({ notes: '[DELETED]' })
+        .eq('id', id);
 
     if (error) throw error;
-    return data;
 }
 
 // --- TOURS ---
