@@ -165,7 +165,7 @@ export function TourForm() {
                             name="price"
                             render={({ field }: { field: any }) => (
                                 <FormItem>
-                                    <FormLabel>Price ($)</FormLabel>
+                                    <FormLabel>Price (€)</FormLabel>
                                     <FormControl>
                                         <Input type="number" min={0} {...field} onChange={(e: React.ChangeEvent<HTMLInputElement>) => field.onChange(+e.target.value)} />
                                     </FormControl>

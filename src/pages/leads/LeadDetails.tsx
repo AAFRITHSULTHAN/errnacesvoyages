@@ -408,7 +408,7 @@ export function LeadDetails() {
                                 <div>
                                     <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">Budget Amount</p>
                                     <p className="text-sm font-black text-emerald-600 mt-1">
-                                        {lead.budget ? `$${lead.budget.toLocaleString()}` : 'Not Specified'}
+                                        {lead.budget ? `€${lead.budget.toLocaleString()}` : 'Not Specified'}
                                     </p>
                                 </div>
                             </div>
@@ -474,7 +474,7 @@ export function LeadDetails() {
                                             <div className="w-px h-8 bg-slate-200" />
                                             <div>
                                                 <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Price Package</p>
-                                                <p className="text-base font-black text-emerald-600">${interestedTourDetails.price.toLocaleString()}</p>
+                                                <p className="text-base font-black text-emerald-600">€{interestedTourDetails.price.toLocaleString()}</p>
                                             </div>
                                         </div>
                                     </div>

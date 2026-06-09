@@ -5,7 +5,7 @@ import type { Lead } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Phone, Mail, DollarSign, Calendar, Globe, Map } from 'lucide-react';
+import { Phone, Mail, Euro, Calendar, Globe, Map } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LeadCardProps {
@@ -81,7 +81,7 @@ export function LeadCard({ lead }: LeadCardProps) {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 ">
                             <div className="bg-white p-1 rounded shadow-xs">
-                                <DollarSign className="w-3 h-3 text-emerald-600" />
+                                <Euro className="w-3 h-3 text-emerald-600" />
                             </div>
                             <span className="text-[13px] font-extrabold text-slate-900 tracking-tight">
                                 {lead.budget ? lead.budget.toLocaleString() : '0'}

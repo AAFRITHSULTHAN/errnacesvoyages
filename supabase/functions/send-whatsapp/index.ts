@@ -60,6 +60,7 @@ serve(async (req) => {
           .insert({
             name: `WhatsApp (${cleanPhone})`,
             phone: cleanPhone,
+            email: `${normalizedSearch}@whatsapp.crm`,
             source: 'WhatsApp',
             status: 'new'
           })

@@ -126,7 +126,7 @@ export function LeadsTable({ leads, onEdit, onDelete, onWhatsApp }: LeadsTablePr
                                         {lead.budget ? (
                                             <span className="text-[11px] font-black text-emerald-600 mt-0.5 flex items-center gap-1">
                                                 <Hash className="h-2.5 w-2.5 opacity-70" />
-                                                ${lead.budget.toLocaleString()}
+                                                €{lead.budget.toLocaleString()}
                                             </span>
                                         ) : (
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Not Specified</span>

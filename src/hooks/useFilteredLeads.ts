@@ -8,5 +8,11 @@ import { useAppStore } from '@/store';
  */
 export function useFilteredLeads() {
     const { leads } = useAppStore();
-    return useMemo(() => leads.filter(l => l.source !== 'Staff'), [leads]);
+    return useMemo(() => leads.filter(l => 
+        l.source !== 'Staff' && 
+        l.source !== 'WhatsApp' && 
+        l.source !== 'WhatsApp Sync' && 
+        l.source !== 'WhatsApp Web' && 
+        l.source !== 'WhatsApp Group'
+    ), [leads]);
 }

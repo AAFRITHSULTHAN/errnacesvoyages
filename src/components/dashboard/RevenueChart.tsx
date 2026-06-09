@@ -54,12 +54,12 @@ export function RevenueChart({ data }: RevenueChartProps) {
                                             boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)',
                                             fontSize: '12px'
                                         }}
-                                        formatter={(value: number | undefined) => [value ? `$${value.toLocaleString()}` : '$0', 'Revenue']}
+                                        formatter={(value: number | undefined) => [value ? `€${value.toLocaleString()}` : '€0', 'Revenue']}
                                     />
                                 </PieChart>
                             </ResponsiveContainer>
                             <div className="absolute inset-x-0 bottom-[15%] flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-lg font-bold text-slate-900 tracking-tight">${totalRevenue.toLocaleString()}</span>
+                                <span className="text-lg font-bold text-slate-900 tracking-tight">€{totalRevenue.toLocaleString()}</span>
                                 <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Total Revenue</span>
                             </div>
                         </>

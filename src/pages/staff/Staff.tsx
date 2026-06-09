@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { StaffForm } from '@/components/staff/StaffForm';
 import { useAppStore } from '@/store';
+import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import type { User, KPI } from '@/types';
@@ -38,7 +39,8 @@ import { KPICards } from '@/components/dashboard/KPICards';
 
 
 export function Staff() {
-    const { staff, addStaff, updateStaff, deleteStaff, fetchStaff, leads, fetchLeads } = useAppStore();
+    const { staff, addStaff, updateStaff, deleteStaff, fetchStaff, fetchLeads } = useAppStore();
+    const leads = useFilteredLeads();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -94,7 +96,7 @@ export function Staff() {
             { label: t('totalLeads'), value: totalAssigned, icon: 'Users' },
             { label: t('convertedCol'), value: totalConverted, icon: 'UserCheck' },
             { label: t('conversionRate'), value: `${avgConversion}%`, icon: 'TrendingUp' },
-            { label: t('revenue'), value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign' },
+            { label: t('revenue'), value: `€${totalRevenue.toLocaleString()}`, icon: 'Euro' },
         ];
 
         return { totalAssigned, totalConverted, avgConversion, totalRevenue, kpis };
@@ -277,7 +279,7 @@ export function Staff() {
                                             <div className="flex flex-col gap-1.5">
                                                 <div className="flex items-center justify-between gap-4 w-32">
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Revenue</span>
-                                                    <span className="text-[13px] font-black text-blue-700">${member.salesRevenue.toLocaleString()}</span>
+                                                    <span className="text-[13px] font-black text-blue-700">€{member.salesRevenue.toLocaleString()}</span>
                                                 </div>
                                                 <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
                                                     <div

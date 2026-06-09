@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useAppStore } from '@/store';
+import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 import { format, subMonths, eachDayOfInterval, startOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function LeadsHeatmap() {
-    const { leads } = useAppStore();
+    const leads = useFilteredLeads();
 
     const heatmapData = useMemo(() => {
         const today = startOfDay(new Date());

@@ -82,6 +82,21 @@ export const useAppStore = create<AppState>((set, get) => ({
                 isLoading: false
             }));
             toast.success('Lead added successfully');
+
+            // Send welcome template via WhatsApp if phone is present and not from CSV Import
+            if (newLead.phone && newLead.source !== 'CSV Import') {
+                try {
+                    await get().sendWhatsApp(
+                        newLead.id,
+                        newLead.phone,
+                        `Hello ${newLead.name}, thank you for contacting Errances Voyages! We have received your inquiry. A travel specialist will get back to you shortly. How can we help you today?`,
+                        'HX2ada749a93d94f4a77cf706c63173358',
+                        { '1': newLead.name }
+                    );
+                } catch (whatsappErr) {
+                    console.error('Failed to automatically send welcome WhatsApp template:', whatsappErr);
+                }
+            }
         } catch (error: any) {
             console.error('Failed to add lead:', error);
 

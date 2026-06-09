@@ -32,7 +32,7 @@ import {
     User,
     TrendingUp,
     CheckCircle2,
-    DollarSign
+    Euro
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -274,7 +274,14 @@ export function StaffDetails() {
     const stats = useMemo(() => {
         if (!member) return { dealsClosed: 0, totalRevenue: 0, conversion: 0, totalLeads: 0, staffLeads: [] };
 
-        const staffLeads = leads.filter(l => l.assigned_staff_id === member.id);
+        const filteredLeads = leads.filter(l => 
+            l.source !== 'Staff' && 
+            l.source !== 'WhatsApp' && 
+            l.source !== 'WhatsApp Sync' && 
+            l.source !== 'WhatsApp Web' && 
+            l.source !== 'WhatsApp Group'
+        );
+        const staffLeads = filteredLeads.filter(l => l.assigned_staff_id === member.id);
         const totalLeads = staffLeads.length;
         const convertedLeads = staffLeads.filter(l => l.status === 'converted');
 
@@ -597,7 +604,7 @@ export function StaffDetails() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-3 text-right">
-                                                    <p className="text-[12px] font-black text-slate-900 tracking-tight">${(lead.budget || 0).toLocaleString()}</p>
+                                                    <p className="text-[12px] font-black text-slate-900 tracking-tight">€{(lead.budget || 0).toLocaleString()}</p>
                                                 </td>
                                             </tr>
                                         )) : (
@@ -670,7 +677,7 @@ export function StaffDetails() {
                         {[
                             { label: 'Assigned', value: stats.totalLeads, icon: Users, color: 'violet' },
                             { label: 'Converted', value: stats.dealsClosed, icon: CheckCircle2, color: 'emerald' },
-                            { label: 'Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'indigo' },
+                            { label: 'Revenue', value: `€${stats.totalRevenue.toLocaleString()}`, icon: Euro, color: 'indigo' },
                             { label: 'Efficiency', value: `${stats.conversion}%`, icon: TrendingUp, color: 'amber' }
                         ].map((item) => (
                             <Card key={item.label} className="border-none shadow-sm bg-white overflow-hidden group hover:-translate-y-1 transition-all duration-300 rounded-[1.2rem]">
@@ -789,7 +796,7 @@ export function StaffDetails() {
                                             fontWeight={700}
                                             tickLine={false}
                                             axisLine={false}
-                                            tickFormatter={(val) => `$${val}`}
+                                            tickFormatter={(val) => `€${val}`}
                                         />
                                         <RechartsTooltip
                                             content={({ active, payload }) => {
@@ -799,7 +806,7 @@ export function StaffDetails() {
                                                         <div className="bg-white/95 backdrop-blur-xl p-2.5 rounded-xl border border-white shadow-xl">
                                                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">{dataPoint.date}</p>
                                                             <div className="mt-1">
-                                                                <p className="text-[9px] font-bold text-slate-500">Revenue: <span className="font-black text-slate-900">${dataPoint.revenue.toLocaleString()}</span></p>
+                                                                <p className="text-[9px] font-bold text-slate-500">Revenue: <span className="font-black text-slate-900">€{dataPoint.revenue.toLocaleString()}</span></p>
                                                             </div>
                                                         </div>
                                                     );

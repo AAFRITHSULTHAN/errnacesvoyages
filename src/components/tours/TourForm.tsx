@@ -99,7 +99,7 @@ export function TourForm({ initialData, onSubmit, onCancel }: TourFormProps) {
                         name="price"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Price ($)</FormLabel>
+                                <FormLabel>Price (€)</FormLabel>
                                 <FormControl>
                                     <Input
                                         type="number"

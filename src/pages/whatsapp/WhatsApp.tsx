@@ -8,11 +8,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/Toast';
 
-import { Search, MoreVertical, Paperclip, Send, Smile, CheckCheck, Check, AlertTriangle, Users, Loader2, X } from 'lucide-react';
+import { Search, MoreVertical, Paperclip, Send, Smile, CheckCheck, Check, AlertTriangle, Users, Loader2, X, Plus, RefreshCw } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useAppStore } from '@/store';
 import { supabase, anonClient } from '@/lib/supabase';
+
+import type { Lead } from '@/types';
 
 type Message = {
     id: string;
@@ -31,13 +34,17 @@ type Contact = {
     unreadCount?: number;
     status: 'online' | 'offline';
     phone: string;
+    source?: string;
+    notes?: string;
 };
 
 export function WhatsApp() {
     const rawLeads = useAppStore(state => state.leads);
-    const leads = useMemo(() => rawLeads.filter(l => l.source !== 'Staff'), [rawLeads]);
+    const leads = rawLeads;
     const fetchLeads = useAppStore(state => state.fetchLeads);
     const sendWhatsApp = useAppStore(state => state.sendWhatsApp);
+    const staff = useAppStore(state => state.staff);
+    const fetchStaff = useAppStore(state => state.fetchStaff);
     const location = useLocation();
 
     const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -48,12 +55,250 @@ export function WhatsApp() {
     const [dbError, setDbError] = useState(false);
     const [isLastMessagesLoaded, setIsLastMessagesLoaded] = useState(false);
 
+
+
     // Emoji Picker, Search and Attachment states
     const [isEmojiOpen, setIsEmojiOpen] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const [messageSearchQuery, setMessageSearchQuery] = useState('');
     const [isAttaching, setIsAttaching] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Dialog states for Group Chats
+    const [isNewGroupOpen, setIsNewGroupOpen] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
+    const [selectedGroupMembers, setSelectedGroupMembers] = useState<string[]>([]);
+
+    const [isEditGroupOpen, setIsEditGroupOpen] = useState(false);
+    const [editGroupName, setEditGroupName] = useState('');
+    const [editGroupMembers, setEditGroupMembers] = useState<string[]>([]);
+
+    // Set edit inputs when selected group chat changes
+    useEffect(() => {
+        if (selectedContact && (selectedContact as any).source === 'WhatsApp Group') {
+            setEditGroupName(selectedContact.name);
+            try {
+                const membersObj = JSON.parse((selectedContact as any).notes || '{"members":[]}');
+                setEditGroupMembers(membersObj.members || []);
+            } catch (err) {
+                setEditGroupMembers([]);
+            }
+        }
+    }, [selectedContact]);
+
+    const handleCreateGroup = async () => {
+        if (!newGroupName.trim() || selectedGroupMembers.length === 0) return;
+        
+        try {
+            const newGroupId = crypto.randomUUID();
+            const groupLead = {
+                id: newGroupId,
+                name: newGroupName,
+                email: 'group@whatsapp.crm',
+                phone: 'group-' + newGroupId.substring(0, 8),
+                status: 'converted' as const,
+                source: 'WhatsApp Group',
+                created_at: new Date().toISOString(),
+                notes: JSON.stringify({ members: selectedGroupMembers })
+            };
+            
+            const { error } = await supabase.from('leads').insert([groupLead]);
+            if (error) throw error;
+            
+            toast.success('WhatsApp group created successfully');
+            setIsNewGroupOpen(false);
+            await fetchLeads();
+            
+            // Auto select new group
+            const avatar = `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(newGroupName)}`;
+            setSelectedContact({
+                id: newGroupId,
+                name: newGroupName,
+                avatar: avatar,
+                lastMessage: 'No group messages yet',
+                lastMessageTime: new Date(),
+                status: 'online',
+                phone: groupLead.phone,
+                source: 'WhatsApp Group',
+                leadIds: [newGroupId],
+                notes: groupLead.notes
+            } as any);
+        } catch (err: any) {
+            console.error('Failed to create group:', err);
+            toast.error('Failed to create group: ' + err.message);
+        }
+    };
+
+    const handleUpdateGroup = async () => {
+        if (!selectedContact || !editGroupName.trim() || editGroupMembers.length === 0) return;
+        
+        try {
+            const updatedNotes = JSON.stringify({ members: editGroupMembers });
+            const { error } = await supabase
+                .from('leads')
+                .update({
+                    name: editGroupName,
+                    notes: updatedNotes
+                })
+                .eq('id', selectedContact.id);
+                
+            if (error) throw error;
+            
+            toast.success('Group updated successfully');
+            setIsEditGroupOpen(false);
+            await fetchLeads();
+            
+            // Update local selection
+            setSelectedContact(prev => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    name: editGroupName,
+                    notes: updatedNotes
+                } as any;
+            });
+        } catch (err: any) {
+            console.error('Failed to update group:', err);
+            toast.error('Failed to update group: ' + err.message);
+        }
+    };
+
+    // Twilio message sync function
+    const syncTwilioMessages = async (showToast = false) => {
+        const accountSid = import.meta.env.VITE_TWILIO_ACCOUNT_SID;
+        const authToken = import.meta.env.VITE_TWILIO_AUTH_TOKEN;
+        
+        if (!accountSid || !authToken) {
+            if (showToast) toast.error('Twilio credentials not configured in environment variables');
+            return;
+        }
+
+        if (showToast) toast.info('Syncing WhatsApp messages from Twilio...');
+        try {
+            const res = await fetch(`/twilio-api/2010-04-01/Accounts/${accountSid}/Messages.json?PageSize=1000`, {
+                headers: {
+                    'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`
+                }
+            });
+            if (!res.ok) {
+                throw new Error('Failed to fetch from Twilio: ' + res.statusText);
+            }
+            const data = await res.json();
+            const twilioMessages = data.messages || [];
+
+            const phoneToMsgs: Record<string, any[]> = {};
+            twilioMessages.forEach((msg: any) => {
+                if (!msg.from.startsWith('whatsapp:') || !msg.to.startsWith('whatsapp:')) return;
+                
+                const fromNum = msg.from.replace('whatsapp:', '');
+                const toNum = msg.to.replace('whatsapp:', '');
+                
+                const ourNum = import.meta.env.VITE_TWILIO_WHATSAPP_NUMBER || '';
+                const cleanOurNum = ourNum.replace('whatsapp:', '').trim();
+                
+                const otherNum = (fromNum === cleanOurNum) ? toNum : fromNum;
+                
+                if (!phoneToMsgs[otherNum]) {
+                    phoneToMsgs[otherNum] = [];
+                }
+                phoneToMsgs[otherNum].push(msg);
+            });
+
+            let syncedLeadsCount = 0;
+            let syncedMessagesCount = 0;
+
+            await fetchLeads();
+            const currentLeads = useAppStore.getState().leads;
+
+            for (const [phone, msgs] of Object.entries(phoneToMsgs)) {
+                const normalizedSearch = phone.replace(/\D/g, '');
+                
+                let matchingLead = currentLeads.find(l => {
+                    if (!l.phone) return false;
+                    const cleanLeadPhone = l.phone.replace(/\D/g, '');
+                    return cleanLeadPhone === normalizedSearch || 
+                           cleanLeadPhone.endsWith(normalizedSearch) || 
+                           normalizedSearch.endsWith(cleanLeadPhone);
+                });
+
+                if (!matchingLead) {
+                    console.log('Sync: Creating lead for phone:', phone);
+                    try {
+                        const newGroupId = crypto.randomUUID();
+                        const { data: inserted, error } = await supabase
+                            .from('leads')
+                            .insert({
+                                id: newGroupId,
+                                name: `WhatsApp (${phone})`,
+                                phone: phone,
+                                email: `${normalizedSearch}@whatsapp.crm`,
+                                source: 'WhatsApp Sync',
+                                status: 'new'
+                            })
+                            .select()
+                            .single();
+                        if (error) throw error;
+                        matchingLead = inserted as Lead;
+                        syncedLeadsCount++;
+                    } catch (err) {
+                        console.error('Failed to create lead during sync:', err);
+                        continue;
+                    }
+                }
+
+                if (!matchingLead) continue;
+
+                const { data: dbMsgs, error: dbMsgsErr } = await supabase
+                    .from('whatsapp_messages')
+                    .select('*')
+                    .eq('lead_id', matchingLead.id);
+                
+                if (dbMsgsErr) {
+                    console.error('Failed to fetch DB messages for sync:', dbMsgsErr);
+                    continue;
+                }
+
+                for (const tMsg of msgs) {
+                    const isUser = tMsg.direction.startsWith('outbound');
+                    const sender = isUser ? 'user' : 'contact';
+                    
+                    const msgExists = dbMsgs.some(dm => 
+                        dm.content === tMsg.body && 
+                        Math.abs(new Date(dm.created_at).getTime() - new Date(tMsg.date_created).getTime()) < 10000
+                    );
+
+                    if (!msgExists) {
+                        const { error: insErr } = await supabase
+                            .from('whatsapp_messages')
+                            .insert({
+                                lead_id: matchingLead.id,
+                                sender: sender,
+                                content: tMsg.body,
+                                status: tMsg.status === 'read' || tMsg.status === 'delivered' ? 'read' : 'sent',
+                                created_at: new Date(tMsg.date_created).toISOString()
+                            });
+                        
+                        if (insErr) {
+                            console.error('Failed to insert message during sync:', insErr);
+                        } else {
+                            syncedMessagesCount++;
+                        }
+                    }
+                }
+            }
+
+            if (showToast) {
+                toast.success(`Sync Complete! Added ${syncedLeadsCount} new contacts and synced ${syncedMessagesCount} new messages.`);
+            } else if (syncedLeadsCount > 0 || syncedMessagesCount > 0) {
+                toast.success(`Sync updated: Added ${syncedLeadsCount} new contacts and synced ${syncedMessagesCount} new messages.`);
+            }
+            await fetchLeads();
+            fetchLastMessages();
+        } catch (error: any) {
+            console.error('Sync failed:', error);
+            toast.error('Sync failed: ' + error.message);
+        }
+    };
 
     const emojis = [
         '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
@@ -190,10 +435,64 @@ export function WhatsApp() {
     };
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Initial fetch of leads
+    // Initial fetch of leads and staff
     useEffect(() => {
         fetchLeads();
-    }, [fetchLeads]);
+        fetchStaff();
+    }, [fetchLeads, fetchStaff]);
+
+    // Ensure matching dummy lead exists for all staff members who have a phone number
+    useEffect(() => {
+        if (staff.length === 0) return;
+        
+        const syncStaffDummyLeads = async () => {
+            let needsFetch = false;
+            for (const member of staff) {
+                if (!member.phone || member.phone.trim() === '') continue;
+                
+                const exists = rawLeads.some(l => l.id === member.id);
+                if (!exists) {
+                    console.log('WhatsApp: Creating dummy lead for staff', member.id);
+                    try {
+                        const newLead = {
+                            id: member.id,
+                            name: member.full_name,
+                            email: member.email,
+                            phone: member.phone,
+                            status: 'converted' as const,
+                            source: 'Staff',
+                            created_at: new Date().toISOString()
+                        };
+                        await supabase.from('leads').insert([newLead]);
+                        needsFetch = true;
+                    } catch (err) {
+                        console.error('Failed to create dummy lead for staff:', err);
+                    }
+                } else {
+                    // Keep dummy lead in sync if name, email, or phone changed
+                    const dummy = rawLeads.find(l => l.id === member.id);
+                    if (dummy && (dummy.phone !== member.phone || dummy.name !== member.full_name || dummy.email !== member.email)) {
+                        console.log('WhatsApp: Updating dummy lead for staff', member.id);
+                        try {
+                            await supabase.from('leads').update({
+                                name: member.full_name,
+                                email: member.email,
+                                phone: member.phone
+                            }).eq('id', member.id);
+                            needsFetch = true;
+                        } catch (err) {
+                            console.error('Failed to update dummy lead for staff:', err);
+                        }
+                    }
+                }
+            }
+            if (needsFetch) {
+                await fetchLeads();
+            }
+        };
+        
+        syncStaffDummyLeads();
+    }, [staff, rawLeads, fetchLeads]);
 
     // Fetch last messages to show in the sidebar list
     const fetchLastMessages = async () => {
@@ -235,6 +534,11 @@ export function WhatsApp() {
         }
     }, [leads]);
 
+    // Background sync of Twilio messages on mount
+    useEffect(() => {
+        syncTwilioMessages(false);
+    }, []);
+
     // Normalize phone helper
     const normalizePhone = (phone: string) => {
         return phone.replace(/\D/g, '');
@@ -244,6 +548,7 @@ export function WhatsApp() {
     const leadsByPhone = useMemo(() => {
         const groups: Record<string, typeof leads> = {};
         leads.forEach(lead => {
+            if (lead.source === 'WhatsApp Group') return; // Skip groups from phone grouping
             if (lead.phone && lead.phone.trim() !== '') {
                 const norm = normalizePhone(lead.phone);
                 if (!groups[norm]) {
@@ -259,6 +564,7 @@ export function WhatsApp() {
     const contacts: Contact[] = useMemo(() => {
         const list: Contact[] = [];
         
+        // 1. Add individual contacts grouped by phone
         Object.entries(leadsByPhone).forEach(([_, phoneLeads]) => {
             // Find the most recent lead in this group to use as primary metadata
             const sortedLeads = [...phoneLeads].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -290,13 +596,32 @@ export function WhatsApp() {
                 lastMessageTime: lastMsg ? new Date(lastMsg.created_at) : new Date(primaryLead.created_at),
                 status: 'online' as const,
                 phone: primaryLead.phone,
+                source: primaryLead.source,
                 leadIds: leadIds // Include all linked lead IDs
+            } as any);
+        });
+
+        // 2. Add group contacts (source === 'WhatsApp Group')
+        const groupLeads = leads.filter(l => l.source === 'WhatsApp Group');
+        groupLeads.forEach(group => {
+            const lastMsg = lastMessages[group.id];
+            list.push({
+                id: group.id,
+                name: group.name,
+                avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(group.name)}`,
+                lastMessage: lastMsg ? (lastMsg.content.startsWith('data:image/') ? '📷 Photo' : lastMsg.content) : 'No group messages yet',
+                lastMessageTime: lastMsg ? new Date(lastMsg.created_at) : new Date(group.created_at),
+                status: 'online' as const,
+                phone: group.phone || '',
+                source: 'WhatsApp Group',
+                leadIds: [group.id],
+                notes: group.notes // Stores members list JSON string
             } as any);
         });
 
         // Sort by last message time descending
         return list.sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
-    }, [leadsByPhone, lastMessages]);
+    }, [leadsByPhone, leads, lastMessages]);
 
     // Set initial selected contact
     useEffect(() => {
@@ -454,8 +779,37 @@ export function WhatsApp() {
         setMessageInput('');
 
         try {
-            await sendWhatsApp(selectedContact.id, selectedContact.phone, currentMsg);
-            // The real-time subscription will insert the message into state automatically.
+            if ((selectedContact as any).source === 'WhatsApp Group') {
+                // 1. Log group message in Supabase whatsapp_messages table
+                const { error: dbErr } = await supabase.from('whatsapp_messages').insert([{
+                    lead_id: selectedContact.id,
+                    sender: 'user',
+                    content: currentMsg,
+                    status: 'sent'
+                }]);
+                if (dbErr) throw dbErr;
+
+                // 2. Broadcast message to all group members
+                let memberIds: string[] = [];
+                try {
+                    const parsed = JSON.parse((selectedContact as any).notes || '{"members":[]}');
+                    memberIds = parsed.members || [];
+                } catch (err) {}
+
+                const groupMembers = contacts.filter(c => memberIds.includes(c.id) && c.source !== 'WhatsApp Group');
+                if (groupMembers.length > 0) {
+                    toast.info(`Broadcasting message to ${groupMembers.length} group members...`);
+                    groupMembers.forEach(async (member) => {
+                        try {
+                            await sendWhatsApp(member.id, member.phone, currentMsg);
+                        } catch (err) {
+                            console.error(`Group broadcast failed for ${member.name}:`, err);
+                        }
+                    });
+                }
+            } else {
+                await sendWhatsApp(selectedContact.id, selectedContact.phone, currentMsg);
+            }
         } catch (error) {
             console.error("Failed to send WhatsApp message:", error);
         }
@@ -475,17 +829,37 @@ export function WhatsApp() {
                     <div className="flex items-center justify-between">
                         <span className="font-black text-xs uppercase tracking-widest text-slate-400">Chats</span>
                         {!isBroadcastMode ? (
-                            <button
-                                onClick={() => {
-                                    setIsBroadcastMode(true);
-                                    setSelectedContactsForBroadcast([]);
-                                    setIsBroadcastConfirmOpen(false);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-100 transition-colors"
-                            >
-                                <Users className="h-3.5 w-3.5" />
-                                Broadcast
-                            </button>
+                            <div className="flex gap-1.5">
+                                <button
+                                    onClick={() => syncTwilioMessages(true)}
+                                    title="Sync messages from Twilio"
+                                    className="flex items-center justify-center p-1.5 rounded-lg text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-100 transition-colors"
+                                >
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsNewGroupOpen(true);
+                                        setNewGroupName('');
+                                        setSelectedGroupMembers([]);
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border border-emerald-100 transition-colors"
+                                >
+                                    <Plus className="h-3 w-3" />
+                                    Group
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsBroadcastMode(true);
+                                        setSelectedContactsForBroadcast([]);
+                                        setIsBroadcastConfirmOpen(false);
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-100 transition-colors"
+                                >
+                                    <Users className="h-3 w-3" />
+                                    Broadcast
+                                </button>
+                            </div>
                         ) : (
                             <div className="flex gap-1.5">
                                 <button
@@ -811,11 +1185,26 @@ export function WhatsApp() {
                                 <div>
                                     <h3 className="font-semibold text-slate-900 leading-snug">{selectedContact.name}</h3>
                                     <p className="text-[10px] text-slate-500 font-bold leading-none mt-0.5">
-                                        WhatsApp • {selectedContact.phone}
+                                        {(selectedContact as any).source === 'WhatsApp Group' ? (
+                                            `WhatsApp Group • ${JSON.parse((selectedContact as any).notes || '{"members":[]}').members?.length || 0} participants`
+                                        ) : (
+                                            `WhatsApp • ${selectedContact.phone}`
+                                        )}
                                     </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                {(selectedContact as any).source === 'WhatsApp Group' && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="text-slate-500 hover:bg-slate-50 rounded-xl"
+                                        onClick={() => setIsEditGroupOpen(true)}
+                                        title="Manage Group Members"
+                                    >
+                                        <Users className="h-5 w-5 text-indigo-600" />
+                                    </Button>
+                                )}
                                 {isSearchActive ? (
                                     <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-2.5 py-1 border border-slate-200/50">
                                         <input
@@ -841,8 +1230,9 @@ export function WhatsApp() {
                             </div>
                         </div>
 
-                        {/* Messages List */}
-                        <ScrollArea className="flex-1 p-6 z-10">
+
+                                {/* Messages List */}
+                                <ScrollArea className="flex-1 p-6 z-10">
                             <div className="space-y-4">
                                 {messages.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-[300px] text-slate-400 text-center px-4">
@@ -991,7 +1381,7 @@ export function WhatsApp() {
                             </form>
                         </div>
                     </>
-                ) : (
+        ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
                         <div className="h-16 w-16 bg-slate-100 rounded-3xl flex items-center justify-center mb-4">
                             <AlertTriangle className="h-8 w-8 text-slate-400" />
@@ -1001,6 +1391,162 @@ export function WhatsApp() {
                     </div>
                 )}
             </div>
+
+            {/* New Group Dialog */}
+            <Dialog open={isNewGroupOpen} onOpenChange={setIsNewGroupOpen}>
+                <DialogContent className="sm:max-w-[460px] bg-white rounded-2xl border-slate-200 shadow-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black text-slate-800 uppercase tracking-tight">Create New WhatsApp Group</DialogTitle>
+                        <DialogDescription className="text-slate-500 font-medium text-xs">
+                            Create a group list to chat and broadcast messages to multiple contacts simultaneously.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-3">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="group-name" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Group Name</Label>
+                            <Input
+                                id="group-name"
+                                placeholder="Enter group name..."
+                                className="rounded-xl border-slate-200 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 font-bold text-slate-700"
+                                value={newGroupName}
+                                onChange={(e) => setNewGroupName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Group Members</Label>
+                            <ScrollArea className="h-[180px] rounded-xl border border-slate-200 p-2 bg-slate-50">
+                                <div className="space-y-1">
+                                    {contacts
+                                        .filter(c => (c as any).source !== 'WhatsApp Group')
+                                        .map((contact) => (
+                                            <button
+                                                key={contact.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedGroupMembers(prev => 
+                                                        prev.includes(contact.id)
+                                                            ? prev.filter(id => id !== contact.id)
+                                                            : [...prev, contact.id]
+                                                    );
+                                                }}
+                                                className={cn(
+                                                    "flex items-center gap-3 p-2.5 hover:bg-slate-100/80 rounded-lg text-left w-full transition-colors",
+                                                    selectedGroupMembers.includes(contact.id) ? "bg-indigo-50/50" : ""
+                                                )}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedGroupMembers.includes(contact.id)}
+                                                    onChange={() => {}}
+                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                />
+                                                <div className="relative">
+                                                    <Avatar className="h-8 w-8">
+                                                        <AvatarImage src={contact.avatar} />
+                                                        <AvatarFallback className="text-xs font-bold">{contact.name[0]}</AvatarFallback>
+                                                    </Avatar>
+                                                </div>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <span className="text-xs font-bold text-slate-800 truncate block">{contact.name}</span>
+                                                    <span className="text-[9px] text-slate-400 font-bold block">{contact.phone}</span>
+                                                </div>
+                                            </button>
+                                        ))
+                                    }
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="ghost" onClick={() => setIsNewGroupOpen(false)} className="rounded-xl font-bold text-slate-500 hover:bg-slate-100">Cancel</Button>
+                        <Button 
+                            disabled={!newGroupName.trim() || selectedGroupMembers.length === 0} 
+                            onClick={handleCreateGroup}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold px-5"
+                        >
+                            Create Group
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Group Dialog */}
+            <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
+                <DialogContent className="sm:max-w-[460px] bg-white rounded-2xl border-slate-200 shadow-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black text-slate-800 uppercase tracking-tight">Manage Group Members</DialogTitle>
+                        <DialogDescription className="text-slate-500 font-medium text-xs">
+                            Add or remove members from this group list.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-3">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-group-name" className="text-[10px] font-black uppercase tracking-widest text-slate-400">Group Name</Label>
+                            <Input
+                                id="edit-group-name"
+                                placeholder="Group name..."
+                                className="rounded-xl border-slate-200 focus-visible:ring-indigo-500 font-bold text-slate-700"
+                                value={editGroupName}
+                                onChange={(e) => setEditGroupName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Group Members</Label>
+                            <ScrollArea className="h-[180px] rounded-xl border border-slate-200 p-2 bg-slate-50">
+                                <div className="space-y-1">
+                                    {contacts
+                                        .filter(c => (c as any).source !== 'WhatsApp Group')
+                                        .map((contact) => (
+                                            <button
+                                                key={contact.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setEditGroupMembers(prev => 
+                                                        prev.includes(contact.id)
+                                                            ? prev.filter(id => id !== contact.id)
+                                                            : [...prev, contact.id]
+                                                    );
+                                                }}
+                                                className={cn(
+                                                    "flex items-center gap-3 p-2.5 hover:bg-slate-100/80 rounded-lg text-left w-full transition-colors",
+                                                    editGroupMembers.includes(contact.id) ? "bg-indigo-50/50" : ""
+                                                )}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={editGroupMembers.includes(contact.id)}
+                                                    onChange={() => {}}
+                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                />
+                                                <div className="relative">
+                                                    <Avatar className="h-8 w-8">
+                                                        <AvatarImage src={contact.avatar} />
+                                                        <AvatarFallback className="text-xs font-bold">{contact.name[0]}</AvatarFallback>
+                                                    </Avatar>
+                                                </div>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <span className="text-xs font-bold text-slate-800 truncate block">{contact.name}</span>
+                                                    <span className="text-[9px] text-slate-400 font-bold block">{contact.phone}</span>
+                                                </div>
+                                            </button>
+                                        ))
+                                    }
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="ghost" onClick={() => setIsEditGroupOpen(false)} className="rounded-xl font-bold text-slate-500 hover:bg-slate-100">Cancel</Button>
+                        <Button 
+                            disabled={!editGroupName.trim() || editGroupMembers.length === 0} 
+                            onClick={handleUpdateGroup}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold px-5"
+                        >
+                            Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

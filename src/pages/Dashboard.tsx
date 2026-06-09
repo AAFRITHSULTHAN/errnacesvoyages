@@ -59,10 +59,10 @@ export function Dashboard() {
             { label: t('totalLeads'), value: totalLeads.toString(), icon: 'Users', link: '/leads' },
             { label: t('activeTours'), value: activeTours.toString(), icon: 'Map', link: '/tours' },
             { label: t('conversionRate'), value: `${conversionRate}%`, icon: 'TrendingUp', link: '/analytics' },
-            { label: t('revenue'), value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign', link: '/analytics' },
+            { label: t('revenue'), value: `€${totalRevenue.toLocaleString()}`, icon: 'Euro', link: '/analytics' },
             { label: t('pendingFollowUps'), value: pendingFollowUps.toString(), icon: 'Calendar', link: '/pipeline' },
             { label: t('wonLeads'), value: convertedLeads.toString(), icon: 'UserCheck', link: '/leads' },
-            { label: t('avgBudget'), value: convertedLeads > 0 ? `$${Math.round(totalRevenue / convertedLeads).toLocaleString()}` : '$0', icon: 'DollarSign', link: '/analytics' },
+            { label: t('avgBudget'), value: convertedLeads > 0 ? `€${Math.round(totalRevenue / convertedLeads).toLocaleString()}` : '€0', icon: 'Euro', link: '/analytics' },
             { label: t('lostLeads'), value: leads.filter(l => l.status === 'lost').length.toString(), icon: 'Users', link: '/leads' },
         ];
 

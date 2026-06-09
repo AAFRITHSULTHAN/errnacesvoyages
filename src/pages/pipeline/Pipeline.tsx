@@ -66,7 +66,7 @@ export function Pipeline() {
             { label: t('totalLeads'), value: totalLeads.toString(), icon: 'Users' },
             { label: t('convertedCol'), value: convertedLeads.toString(), icon: 'UserCheck' },
             { label: t('conversionRate'), value: `${conversionRate}%`, icon: 'TrendingUp' },
-            { label: t('revenue'), value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign' },
+            { label: t('revenue'), value: `€${totalRevenue.toLocaleString()}`, icon: 'Euro' },
         ];
     }, [leads, t]);
 

@@ -12,7 +12,7 @@ export function AnimatedCounter({ value, duration = 1500 }: AnimatedCounterProps
     const valStr = String(value);
     const numericValue = parseFloat(valStr.replace(/[^0-9.]/g, '')) || 0;
     const isPercentage = valStr.includes('%');
-    const isCurrency = valStr.includes('$');
+    const isCurrency = valStr.includes('$') || valStr.includes('€');
 
     useEffect(() => {
         let startTime: number;
@@ -42,7 +42,7 @@ export function AnimatedCounter({ value, duration = 1500 }: AnimatedCounterProps
             return `${num.toFixed(1)}%`;
         }
         if (isCurrency) {
-            return `$${Math.round(num).toLocaleString()}`;
+            return `€${Math.round(num).toLocaleString()}`;
         }
         return Math.round(num).toLocaleString();
     };

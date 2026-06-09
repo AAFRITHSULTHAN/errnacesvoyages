@@ -12,7 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
     Mail,
     Phone,
-    DollarSign,
+    Euro,
     Users,
     TrendingUp,
     CheckCircle2,
@@ -205,7 +205,14 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
     const stats = useMemo(() => {
         if (!staff) return { dealsClosed: 0, totalRevenue: 0, conversion: 0, totalLeads: 0, staffLeads: [] };
 
-        const staffLeads = leads.filter(l => l.assigned_staff_id === staff.id);
+        const filteredLeads = leads.filter(l => 
+            l.source !== 'Staff' && 
+            l.source !== 'WhatsApp' && 
+            l.source !== 'WhatsApp Sync' && 
+            l.source !== 'WhatsApp Web' && 
+            l.source !== 'WhatsApp Group'
+        );
+        const staffLeads = filteredLeads.filter(l => l.assigned_staff_id === staff.id);
         const totalLeads = staffLeads.length;
         const convertedLeads = staffLeads.filter(l => l.status === 'converted');
 
@@ -282,7 +289,7 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
                                 {[
                                     { label: 'Assigned', value: stats.totalLeads, icon: Users, color: 'violet' },
                                     { label: 'Converted', value: stats.dealsClosed, icon: CheckCircle2, color: 'emerald' },
-                                    { label: 'Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'indigo' },
+                                    { label: 'Revenue', value: `€${stats.totalRevenue.toLocaleString()}`, icon: Euro, color: 'indigo' },
                                     { label: 'Efficiency', value: `${stats.conversion}%`, icon: TrendingUp, color: 'amber' }
                                 ].map((item) => (
                                     <Card key={item.label} className="border-none shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] bg-white overflow-hidden group hover:-translate-y-1 transition-all duration-300 rounded-[1.5rem]">
@@ -346,7 +353,7 @@ export function StaffProfile({ staff, open, onOpenChange }: StaffProfileProps) {
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-3 text-right">
-                                                            <p className="text-[12px] font-black text-slate-900 tracking-tight">${(lead.budget || 0).toLocaleString()}</p>
+                                                            <p className="text-[12px] font-black text-slate-900 tracking-tight">€{(lead.budget || 0).toLocaleString()}</p>
                                                         </td>
                                                     </tr>
                                                 )) : (

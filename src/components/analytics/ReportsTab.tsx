@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useAppStore } from '@/store';
+import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDateRangePicker } from '@/components/dashboard/DateRangePicker';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
@@ -9,7 +9,7 @@ import { isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 const LEAD_SOURCE_COLORS = ['#E50914', '#a855f7', '#f59e0b', '#10b981', '#ef4444', '#6366f1'];
 
 export function ReportsTab() {
-    const { leads } = useAppStore();
+    const leads = useFilteredLeads();
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
     const analytics = useMemo(() => {
@@ -135,7 +135,7 @@ export function ReportsTab() {
                                     <Tooltip
                                         cursor={{ fill: '#f1f5f9' }}
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-                                        formatter={(value: any) => [`$${value}`, 'Revenue']}
+                                        formatter={(value: any) => [`€${value}`, 'Revenue']}
                                     />
                                     <Bar dataKey="revenue" fill="#4f46e5" radius={[4, 4, 0, 0]} />
                                 </BarChart>

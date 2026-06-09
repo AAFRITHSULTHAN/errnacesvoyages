@@ -3,7 +3,7 @@ import { useAppStore } from '@/store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Clock, MapPin, DollarSign, Calendar, Check, X } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Euro, Calendar, Check, X } from 'lucide-react';
 
 export function TourDetails() {
     const { id } = useParams();
@@ -80,7 +80,7 @@ export function TourDetails() {
                             <div className="pb-6 border-b border-slate-100">
                                 <p className="text-sm text-slate-500 mb-1">Price per person</p>
                                 <div className="flex items-baseline gap-1">
-                                    <DollarSign className="w-5 h-5 text-slate-900 self-center" />
+                                    <Euro className="w-5 h-5 text-slate-900 self-center" />
                                     <span className="text-3xl font-bold text-slate-900">{tour.price.toLocaleString()}</span>
                                 </div>
                             </div>

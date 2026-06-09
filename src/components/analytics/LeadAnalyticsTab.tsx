@@ -85,7 +85,7 @@ export function LeadAnalyticsTab() {
             { label: 'Total Leads', value: totalLeads.toString(), icon: 'Users', change: getChange(totalLeads, prevTotalLeads) },
             { label: 'Converted', value: convertedLeads.toString(), icon: 'UserCheck', change: getChange(convertedLeads, prevConvertedLeads) },
             { label: 'Conversion Rate', value: `${conversionRate}%`, icon: 'TrendingUp', change: getRateChange(conversionRate, prevConversionRate) },
-            { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: 'DollarSign', change: getChange(totalRevenue, prevTotalRevenue) },
+            { label: 'Total Revenue', value: `€${totalRevenue.toLocaleString()}`, icon: 'Euro', change: getChange(totalRevenue, prevTotalRevenue) },
         ];
 
         const statusCounts = filteredLeads.reduce((acc, lead) => {

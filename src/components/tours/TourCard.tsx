@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin, DollarSign, Calendar, Trash2 } from 'lucide-react';
+import { Clock, MapPin, Euro, Calendar, Trash2 } from 'lucide-react';
 import type { TourPackage } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -32,7 +32,7 @@ export function TourCard({ tour, isAdmin = false, onEdit, onDelete }: TourCardPr
                 </div>
                 <div className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
                     <div className="flex items-center text-white font-black text-xl">
-                        <DollarSign className="w-5 h-5" />
+                        <Euro className="w-5 h-5" />
                         {tour.price.toLocaleString()}
                     </div>
                 </div>
