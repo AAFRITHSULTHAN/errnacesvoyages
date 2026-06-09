@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -44,7 +44,7 @@ serve(async (req) => {
       // Normalize incoming phone (digits only)
       const normalizedSearch = cleanPhone.replace(/\D/g, '')
 
-      let matchingLead = leads?.find(lead => {
+      let matchingLead = leads?.find((lead: any) => {
         if (!lead.phone) return false
         const cleanLeadPhone = lead.phone.replace(/\D/g, '')
         // Match full normalized string, or suffixes for safety
@@ -62,7 +62,8 @@ serve(async (req) => {
             phone: cleanPhone,
             email: `${normalizedSearch}@whatsapp.crm`,
             source: 'WhatsApp',
-            status: 'new'
+            status: 'new',
+            is_deleted: false
           })
           .select()
           .single()
@@ -72,6 +73,21 @@ serve(async (req) => {
           throw createError
         }
         matchingLead = newLead
+      } else if (matchingLead.is_deleted) {
+        // Automatically restore soft-deleted lead
+        const { data: restoredLead, error: restoreError } = await supabase
+          .from('leads')
+          .update({ is_deleted: false })
+          .eq('id', matchingLead.id)
+          .select()
+          .single()
+
+        if (restoreError) {
+          console.error('Error restoring soft-deleted lead in Twilio webhook:', restoreError)
+        } else {
+          console.log(`Restored soft-deleted lead: ${matchingLead.name}`)
+          matchingLead = restoredLead
+        }
       }
 
       // Save the received WhatsApp message to the database
@@ -130,25 +146,15 @@ serve(async (req) => {
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
       const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-      // 1. Delete associated messages
-      const { error: msgError } = await supabase
-        .from('whatsapp_messages')
-        .delete()
-        .eq('lead_id', leadId)
-
-      if (msgError) {
-        console.error('Error deleting messages in Edge Function:', msgError)
-        throw msgError
-      }
-
-      // 2. Delete lead
+      // Soft delete the lead by setting is_deleted = true
+      // This preserves associated messages due to the leads row staying intact
       const { error: leadError } = await supabase
         .from('leads')
-        .delete()
+        .update({ is_deleted: true })
         .eq('id', leadId)
 
       if (leadError) {
-        console.error('Error deleting lead in Edge Function:', leadError)
+        console.error('Error soft deleting lead in Edge Function:', leadError)
         throw leadError
       }
 
@@ -218,8 +224,9 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    const err = error as any
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: err.message || String(err) }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400 

@@ -207,13 +207,20 @@ export function WhatsApp() {
             let syncedLeadsCount = 0;
             let syncedMessagesCount = 0;
 
-            await fetchLeads();
-            const currentLeads = useAppStore.getState().leads;
+            // Fetch all leads (including soft-deleted ones) from the database to check for matching phone numbers
+            const { data: dbLeads, error: dbLeadsErr } = await supabase
+                .from('leads')
+                .select('*');
+
+            if (dbLeadsErr) {
+                console.error('Sync: Failed to fetch leads from DB:', dbLeadsErr);
+                return;
+            }
 
             for (const [phone, msgs] of Object.entries(phoneToMsgs)) {
                 const normalizedSearch = phone.replace(/\D/g, '');
                 
-                let matchingLead = currentLeads.find(l => {
+                let matchingLead = dbLeads.find(l => {
                     if (!l.phone) return false;
                     const cleanLeadPhone = l.phone.replace(/\D/g, '');
                     return cleanLeadPhone === normalizedSearch || 
@@ -221,7 +228,21 @@ export function WhatsApp() {
                            normalizedSearch.endsWith(cleanLeadPhone);
                 });
 
-                if (!matchingLead) {
+                if (matchingLead) {
+                    // If the matched lead was soft-deleted, restore it in the DB!
+                    if ((matchingLead as any).is_deleted) {
+                        console.log('Sync: Restoring soft-deleted lead for phone:', phone);
+                        const { error: restoreError } = await supabase
+                            .from('leads')
+                            .update({ is_deleted: false })
+                            .eq('id', matchingLead.id);
+                        if (restoreError) {
+                            console.error('Sync: Failed to restore lead:', restoreError);
+                        } else {
+                            (matchingLead as any).is_deleted = false;
+                        }
+                    }
+                } else {
                     console.log('Sync: Creating lead for phone:', phone);
                     try {
                         const newGroupId = crypto.randomUUID();
@@ -233,7 +254,8 @@ export function WhatsApp() {
                                 phone: phone,
                                 email: `${normalizedSearch}@whatsapp.crm`,
                                 source: 'WhatsApp Sync',
-                                status: 'new'
+                                status: 'new',
+                                is_deleted: false
                             })
                             .select()
                             .single();

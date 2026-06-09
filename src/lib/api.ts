@@ -16,6 +16,7 @@ export async function getLeads() {
     const { data, error } = await client
         .from('leads')
         .select('*')
+        .or('is_deleted.is.null,is_deleted.eq.false')
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -26,9 +27,45 @@ export async function getLeads() {
 }
 
 export async function createLead(lead: Partial<Lead>) {
+    if (lead.phone) {
+        const cleanPhone = lead.phone.replace(/\D/g, '');
+        if (cleanPhone) {
+            // Retrieve all leads (including soft-deleted ones) to do phone matching
+            const { data: existingLeads } = await supabase
+                .from('leads')
+                .select('*');
+            
+            const matchingDeletedLead = existingLeads?.find(l => {
+                if (!l.phone || !l.is_deleted) return false;
+                const cleanExistingPhone = l.phone.replace(/\D/g, '');
+                return cleanExistingPhone === cleanPhone || 
+                       cleanExistingPhone.endsWith(cleanPhone) || 
+                       cleanPhone.endsWith(cleanExistingPhone);
+            });
+
+            if (matchingDeletedLead) {
+                // Restore the existing soft-deleted lead and update it with the new info
+                const { data, error } = await supabase
+                    .from('leads')
+                    .update({
+                        ...lead,
+                        is_deleted: false,
+                        created_at: new Date().toISOString() // update timestamp to bring it to top
+                    })
+                    .eq('id', matchingDeletedLead.id)
+                    .select();
+
+                if (!error && data?.[0]) {
+                    console.log('Restored soft-deleted lead:', data[0]);
+                    return data[0] as Lead;
+                }
+            }
+        }
+    }
+
     const { data, error } = await supabase
         .from('leads')
-        .insert([lead])
+        .insert([{ ...lead, is_deleted: false }])
         .select();
 
     if (error) throw error;

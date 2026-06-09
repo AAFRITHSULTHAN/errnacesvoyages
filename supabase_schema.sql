@@ -1,3 +1,6 @@
+-- Soft delete configuration for leads:
+-- ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+
 -- Create whatsapp_messages table
 CREATE TABLE IF NOT EXISTS public.whatsapp_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

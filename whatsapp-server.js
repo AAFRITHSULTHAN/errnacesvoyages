@@ -46,17 +46,43 @@ function cleanJidPhone(jid) {
 }
 
 async function syncContactToSupabase(jid, name, isGroup) {
-    const id = jidToUuid(jid);
     const cleanPhone = cleanJidPhone(jid);
+    const normalizedSearch = cleanPhone.replace(/\D/g, '');
     
-    // Check if lead already exists
-    const { data: existing } = await supabase
+    // Fetch all leads to do normalized phone matching
+    const { data: leads, error: leadsError } = await supabase
         .from('leads')
-        .select('id')
-        .eq('id', id)
-        .maybeSingle();
+        .select('*');
+        
+    if (leadsError) {
+        console.error('Failed to fetch leads for contact sync:', leadsError.message);
+        return null;
+    }
 
-    if (!existing) {
+    let matchingLead = leads?.find(lead => {
+        if (!lead.phone) return false;
+        const cleanLeadPhone = lead.phone.replace(/\D/g, '');
+        return cleanLeadPhone === normalizedSearch || 
+               cleanLeadPhone.endsWith(normalizedSearch) || 
+               normalizedSearch.endsWith(cleanLeadPhone);
+    });
+
+    if (matchingLead) {
+        // If the matching lead was soft-deleted, restore it!
+        if (matchingLead.is_deleted) {
+            console.log(`Restoring soft-deleted lead for contact: ${matchingLead.name}`);
+            const { error: restoreError } = await supabase
+                .from('leads')
+                .update({ is_deleted: false })
+                .eq('id', matchingLead.id);
+            if (restoreError) {
+                console.error(`Failed to restore lead:`, restoreError.message);
+            }
+        }
+        return matchingLead.id;
+    } else {
+        // Create new lead using deterministic UUID
+        const id = jidToUuid(jid);
         console.log(`Syncing new contact: ${name || cleanPhone} (${jid})`);
         const { error } = await supabase
             .from('leads')
@@ -67,16 +93,17 @@ async function syncContactToSupabase(jid, name, isGroup) {
                 email: isGroup ? `group-${cleanPhone}@whatsapp.group` : `${cleanPhone}@whatsapp.crm`,
                 source: isGroup ? 'WhatsApp Group' : 'WhatsApp Web',
                 status: isGroup ? 'converted' : 'new',
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+                is_deleted: false
             });
         if (error) {
             console.error(`Failed to create lead for ${jid}:`, error.message);
         }
+        return id;
     }
 }
 
-async function syncMessageToSupabase(msg, jid) {
-    const leadId = jidToUuid(jid);
+async function syncMessageToSupabase(msg, leadId) {
     const messageContent = msg.message?.conversation || 
                           msg.message?.extendedTextMessage?.text || 
                           msg.message?.imageMessage?.caption || 
@@ -167,7 +194,10 @@ async function startWhatsApp() {
         if (messages) {
             for (const msg of messages) {
                 if (msg.key?.remoteJid) {
-                    await syncMessageToSupabase(msg, msg.key.remoteJid);
+                    const leadId = await syncContactToSupabase(msg.key.remoteJid, null, msg.key.remoteJid.endsWith('@g.us'));
+                    if (leadId) {
+                        await syncMessageToSupabase(msg, leadId);
+                    }
                 }
             }
         }
@@ -182,11 +212,13 @@ async function startWhatsApp() {
             const jid = msg.key.remoteJid;
             const isGroup = jid.endsWith('@g.us');
             
-            // Sync contact first if we don't have it
-            await syncContactToSupabase(jid, null, isGroup);
+            // Sync contact first and get correct leadId
+            const leadId = await syncContactToSupabase(jid, null, isGroup);
             
             // Sync live message
-            await syncMessageToSupabase(msg, jid);
+            if (leadId) {
+                await syncMessageToSupabase(msg, leadId);
+            }
         }
     });
 }
