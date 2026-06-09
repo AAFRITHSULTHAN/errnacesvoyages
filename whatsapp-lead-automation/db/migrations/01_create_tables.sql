@@ -25,5 +25,8 @@ ALTER TABLE public.leads
 ALTER TABLE public.whatsapp_conversations ENABLE ROW LEVEL SECURITY;
 
 -- 4. Create Policies Allowing Access to Service Role Key (Server Side Integration)
+-- Drop policy first if it already exists to prevent SQL execution failures
+DROP POLICY IF EXISTS "Allow service_role full access on whatsapp_conversations" ON public.whatsapp_conversations;
+
 CREATE POLICY "Allow service_role full access on whatsapp_conversations" ON public.whatsapp_conversations
     FOR ALL TO service_role USING (true) WITH CHECK (true);
