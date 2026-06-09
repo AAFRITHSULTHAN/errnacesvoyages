@@ -84,7 +84,7 @@ async function syncContactToSupabase(jid, name, isGroup) {
         // Create new lead using deterministic UUID
         const id = jidToUuid(jid);
         console.log(`Syncing new contact: ${name || cleanPhone} (${jid})`);
-        const { error } = await supabase
+        let { error } = await supabase
             .from('leads')
             .insert({
                 id: id,
@@ -96,6 +96,21 @@ async function syncContactToSupabase(jid, name, isGroup) {
                 created_at: new Date().toISOString(),
                 is_deleted: false
             });
+        if (error && (error.message?.includes('is_deleted') || error.code === 'PGRST100')) {
+            console.warn(`Local WhatsApp Server: is_deleted column missing, inserting without it`);
+            const fallbackResult = await supabase
+                .from('leads')
+                .insert({
+                    id: id,
+                    name: name || (isGroup ? 'Unnamed Group' : `WhatsApp (${cleanPhone})`),
+                    phone: isGroup ? `group-${cleanPhone}` : `+${cleanPhone}`,
+                    email: isGroup ? `group-${cleanPhone}@whatsapp.group` : `${cleanPhone}@whatsapp.crm`,
+                    source: isGroup ? 'WhatsApp Group' : 'WhatsApp Web',
+                    status: isGroup ? 'converted' : 'new',
+                    created_at: new Date().toISOString()
+                });
+            error = fallbackResult.error;
+        }
         if (error) {
             console.error(`Failed to create lead for ${jid}:`, error.message);
         }

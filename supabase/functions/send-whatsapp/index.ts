@@ -55,7 +55,7 @@ serve(async (req: Request) => {
 
       if (!matchingLead) {
         // Automatically create a new lead for the incoming WhatsApp contact
-        const { data: newLead, error: createError } = await supabase
+        let { data: newLead, error: createError } = await supabase
           .from('leads')
           .insert({
             name: `WhatsApp (${cleanPhone})`,
@@ -67,6 +67,23 @@ serve(async (req: Request) => {
           })
           .select()
           .single()
+
+        if (createError && (createError.message?.includes('is_deleted') || createError.code === 'PGRST100')) {
+          console.warn('Edge Function: is_deleted column missing, inserting without it')
+          const fallbackResult = await supabase
+            .from('leads')
+            .insert({
+              name: `WhatsApp (${cleanPhone})`,
+              phone: cleanPhone,
+              email: `${normalizedSearch}@whatsapp.crm`,
+              source: 'WhatsApp',
+              status: 'new'
+            })
+            .select()
+            .single()
+          newLead = fallbackResult.data
+          createError = fallbackResult.error
+        }
 
         if (createError) {
           console.error('Error creating new lead for unknown WhatsApp sender:', createError)

@@ -30,6 +30,8 @@ interface AppState {
     updateStaff: (id: string, updates: Partial<User>) => Promise<void>;
     deleteStaff: (id: string) => Promise<void>;
     sendWhatsApp: (leadId: string, to: string, message: string, contentSid?: string, contentVariables?: Record<string, string>) => Promise<void>;
+    deleteWhatsAppMessage: (id: string) => Promise<void>;
+    updateWhatsAppMessage: (id: string, content: string) => Promise<void>;
 }
 
 // Mock Data removed
@@ -325,6 +327,26 @@ export const useAppStore = create<AppState>((set, get) => ({
         } catch (error: any) {
             console.error('Failed to send WhatsApp message:', error);
             toast.error(error.message || 'Failed to send WhatsApp message');
+            throw error;
+        }
+    },
+    deleteWhatsAppMessage: async (id) => {
+        try {
+            await api.deleteWhatsAppMessage(id);
+            toast.success('Message deleted successfully');
+        } catch (error) {
+            console.error('Failed to delete WhatsApp message:', error);
+            toast.error('Failed to delete message');
+            throw error;
+        }
+    },
+    updateWhatsAppMessage: async (id, content) => {
+        try {
+            await api.updateWhatsAppMessage(id, content);
+            toast.success('Message updated successfully');
+        } catch (error) {
+            console.error('Failed to update WhatsApp message:', error);
+            toast.error('Failed to update message');
             throw error;
         }
     },

@@ -18,6 +18,7 @@ ALTER TABLE public.whatsapp_messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public read access" ON public.whatsapp_messages;
 DROP POLICY IF EXISTS "Allow public insert access" ON public.whatsapp_messages;
 DROP POLICY IF EXISTS "Allow public update access" ON public.whatsapp_messages;
+DROP POLICY IF EXISTS "Allow public delete access" ON public.whatsapp_messages;
 
 -- Create policies (allowing full operations for both anon/authenticated roles to make client integration simple)
 CREATE POLICY "Allow public read access" ON public.whatsapp_messages
@@ -28,6 +29,9 @@ CREATE POLICY "Allow public insert access" ON public.whatsapp_messages
 
 CREATE POLICY "Allow public update access" ON public.whatsapp_messages
     FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public delete access" ON public.whatsapp_messages
+    FOR DELETE USING (true);
 
 -- Enable Realtime replication for the whatsapp_messages table
 -- Check if the table is already in the publication first, or add it safely.

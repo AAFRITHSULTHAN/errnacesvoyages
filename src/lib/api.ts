@@ -13,11 +13,23 @@ export async function getLeads() {
         client = anonClient;
     }
 
-    const { data, error } = await client
+    // Try querying with is_deleted filter
+    let { data, error } = await client
         .from('leads')
         .select('*')
         .or('is_deleted.is.null,is_deleted.eq.false')
         .order('created_at', { ascending: false });
+
+    // Fallback if the is_deleted column doesn't exist yet in the database
+    if (error && (error.code === 'PGRST100' || error.message?.includes('is_deleted') || (error as any).details?.includes('is_deleted'))) {
+        console.warn('API: leads.is_deleted column not found, falling back to standard query');
+        const fallbackResult = await client
+            .from('leads')
+            .select('*')
+            .order('created_at', { ascending: false });
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+    }
 
     if (error) {
         console.error('API: getLeads error:', error);
@@ -35,38 +47,52 @@ export async function createLead(lead: Partial<Lead>) {
                 .from('leads')
                 .select('*');
             
-            const matchingDeletedLead = existingLeads?.find(l => {
-                if (!l.phone || !l.is_deleted) return false;
-                const cleanExistingPhone = l.phone.replace(/\D/g, '');
-                return cleanExistingPhone === cleanPhone || 
-                       cleanExistingPhone.endsWith(cleanPhone) || 
-                       cleanPhone.endsWith(cleanExistingPhone);
-            });
+            if (existingLeads) {
+                const matchingDeletedLead = existingLeads.find(l => {
+                    if (!l.phone || !l.is_deleted) return false;
+                    const cleanExistingPhone = l.phone.replace(/\D/g, '');
+                    return cleanExistingPhone === cleanPhone || 
+                           cleanExistingPhone.endsWith(cleanPhone) || 
+                           cleanPhone.endsWith(cleanExistingPhone);
+                });
 
-            if (matchingDeletedLead) {
-                // Restore the existing soft-deleted lead and update it with the new info
-                const { data, error } = await supabase
-                    .from('leads')
-                    .update({
-                        ...lead,
-                        is_deleted: false,
-                        created_at: new Date().toISOString() // update timestamp to bring it to top
-                    })
-                    .eq('id', matchingDeletedLead.id)
-                    .select();
+                if (matchingDeletedLead) {
+                    // Restore the existing soft-deleted lead and update it with the new info
+                    const { data, error } = await supabase
+                        .from('leads')
+                        .update({
+                            ...lead,
+                            is_deleted: false,
+                            created_at: new Date().toISOString() // update timestamp to bring it to top
+                        })
+                        .eq('id', matchingDeletedLead.id)
+                        .select();
 
-                if (!error && data?.[0]) {
-                    console.log('Restored soft-deleted lead:', data[0]);
-                    return data[0] as Lead;
+                    if (!error && data?.[0]) {
+                        console.log('Restored soft-deleted lead:', data[0]);
+                        return data[0] as Lead;
+                    }
                 }
             }
         }
     }
 
-    const { data, error } = await supabase
+    // Try inserting with is_deleted field
+    let { data, error } = await supabase
         .from('leads')
         .insert([{ ...lead, is_deleted: false }])
         .select();
+
+    // Fallback if is_deleted column doesn't exist
+    if (error && (error.code === 'PGRST100' || error.message?.includes('is_deleted') || (error as any).details?.includes('is_deleted'))) {
+        console.warn('API: leads.is_deleted column not found, inserting without it');
+        const fallbackResult = await supabase
+            .from('leads')
+            .insert([lead])
+            .select();
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+    }
 
     if (error) throw error;
     return data?.[0] as Lead;
@@ -319,4 +345,25 @@ export async function sendWhatsAppMessage(
     }
 
     return await response.json();
+}
+
+export async function deleteWhatsAppMessage(id: string) {
+    const { error } = await supabase
+        .from('whatsapp_messages')
+        .delete()
+        .eq('id', id);
+
+    if (error) throw error;
+}
+
+export async function updateWhatsAppMessage(id: string, content: string) {
+    const { data, error } = await supabase
+        .from('whatsapp_messages')
+        .update({ content })
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
 }

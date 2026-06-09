@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/Toast';
 
-import { Search, MoreVertical, Paperclip, Send, Smile, CheckCheck, Check, AlertTriangle, Users, Loader2, X, Plus, RefreshCw } from 'lucide-react';
+import { Search, MoreVertical, Paperclip, Send, Smile, CheckCheck, Check, AlertTriangle, Users, Loader2, X, Plus, RefreshCw, Edit, Trash2, Forward } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -43,6 +43,8 @@ export function WhatsApp() {
     const leads = rawLeads;
     const fetchLeads = useAppStore(state => state.fetchLeads);
     const sendWhatsApp = useAppStore(state => state.sendWhatsApp);
+    const deleteWhatsAppMessage = useAppStore(state => state.deleteWhatsAppMessage);
+    const updateWhatsAppMessage = useAppStore(state => state.updateWhatsAppMessage);
     const staff = useAppStore(state => state.staff);
     const fetchStaff = useAppStore(state => state.fetchStaff);
     const location = useLocation();
@@ -54,6 +56,15 @@ export function WhatsApp() {
     const [searchTerm, setSearchTerm] = useState('');
     const [dbError, setDbError] = useState(false);
     const [isLastMessagesLoaded, setIsLastMessagesLoaded] = useState(false);
+
+    // Edit message state
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+
+    // Forward message states
+    const [isForwardOpen, setIsForwardOpen] = useState(false);
+    const [forwardContent, setForwardContent] = useState('');
+    const [selectedContactsForForward, setSelectedContactsForForward] = useState<string[]>([]);
+    const [forwardSearchTerm, setForwardSearchTerm] = useState('');
 
 
 
@@ -242,11 +253,11 @@ export function WhatsApp() {
                             (matchingLead as any).is_deleted = false;
                         }
                     }
-                } else {
+                 } else {
                     console.log('Sync: Creating lead for phone:', phone);
                     try {
                         const newGroupId = crypto.randomUUID();
-                        const { data: inserted, error } = await supabase
+                        let { data: inserted, error } = await supabase
                             .from('leads')
                             .insert({
                                 id: newGroupId,
@@ -259,6 +270,24 @@ export function WhatsApp() {
                             })
                             .select()
                             .single();
+                        
+                        if (error && (error.message?.includes('is_deleted') || error.code === 'PGRST100')) {
+                            const fallbackResult = await supabase
+                                .from('leads')
+                                .insert({
+                                    id: newGroupId,
+                                    name: `WhatsApp (${phone})`,
+                                    phone: phone,
+                                    email: `${normalizedSearch}@whatsapp.crm`,
+                                    source: 'WhatsApp Sync',
+                                    status: 'new'
+                                })
+                                .select()
+                                .single();
+                            inserted = fallbackResult.data;
+                            error = fallbackResult.error;
+                        }
+                        
                         if (error) throw error;
                         matchingLead = inserted as Lead;
                         syncedLeadsCount++;
@@ -736,35 +765,52 @@ export function WhatsApp() {
                     .on(
                         'postgres_changes',
                         {
-                            event: 'INSERT',
+                            event: '*',
                             schema: 'public',
                             table: 'whatsapp_messages'
                         },
                         (payload) => {
                             if (!isMounted) return;
-                            const newMessage = payload.new;
+                            const eventType = payload.eventType;
                             
-                            // Update last message mapping dynamically for sidebar preview and sorting
-                            setLastMessages(prev => ({
-                                ...prev,
-                                [newMessage.lead_id]: {
-                                    content: newMessage.content,
-                                    created_at: newMessage.created_at
-                                }
-                            }));
-
-                            // If the new message is for the currently active phone number group, append it
-                            if (targetIds.includes(newMessage.lead_id)) {
-                                setMessages(prev => {
-                                    if (prev.some(m => m.id === newMessage.id)) return prev;
-                                    return [...prev, {
-                                        id: newMessage.id,
+                            if (eventType === 'INSERT') {
+                                const newMessage = payload.new;
+                                // Update last message mapping dynamically for sidebar preview and sorting
+                                setLastMessages(prev => ({
+                                    ...prev,
+                                    [newMessage.lead_id]: {
                                         content: newMessage.content,
-                                        sender: newMessage.sender as 'user' | 'contact',
-                                        timestamp: new Date(newMessage.created_at),
-                                        status: newMessage.status as 'sent' | 'delivered' | 'read'
-                                    }];
-                                });
+                                        created_at: newMessage.created_at
+                                    }
+                                }));
+
+                                // If the new message is for the currently active phone number group, append it
+                                if (targetIds.includes(newMessage.lead_id)) {
+                                    setMessages(prev => {
+                                        if (prev.some(m => m.id === newMessage.id)) return prev;
+                                        return [...prev, {
+                                            id: newMessage.id,
+                                            content: newMessage.content,
+                                            sender: newMessage.sender as 'user' | 'contact',
+                                            timestamp: new Date(newMessage.created_at),
+                                            status: newMessage.status as 'sent' | 'delivered' | 'read'
+                                        }];
+                                    });
+                                }
+                            } else if (eventType === 'DELETE') {
+                                const oldMessage = payload.old;
+                                setMessages(prev => prev.filter(m => m.id !== oldMessage.id));
+                                fetchLastMessages(); // Refresh sidebar preview
+                            } else if (eventType === 'UPDATE') {
+                                const updatedMessage = payload.new;
+                                if (targetIds.includes(updatedMessage.lead_id)) {
+                                    setMessages(prev => prev.map(m => m.id === updatedMessage.id ? {
+                                        ...m,
+                                        content: updatedMessage.content,
+                                        status: updatedMessage.status as 'sent' | 'delivered' | 'read'
+                                    } : m));
+                                }
+                                fetchLastMessages(); // Refresh sidebar preview
                             }
                         }
                     )
@@ -801,39 +847,70 @@ export function WhatsApp() {
         setMessageInput('');
 
         try {
-            if ((selectedContact as any).source === 'WhatsApp Group') {
-                // 1. Log group message in Supabase whatsapp_messages table
-                const { error: dbErr } = await supabase.from('whatsapp_messages').insert([{
-                    lead_id: selectedContact.id,
-                    sender: 'user',
-                    content: currentMsg,
-                    status: 'sent'
-                }]);
-                if (dbErr) throw dbErr;
-
-                // 2. Broadcast message to all group members
-                let memberIds: string[] = [];
-                try {
-                    const parsed = JSON.parse((selectedContact as any).notes || '{"members":[]}');
-                    memberIds = parsed.members || [];
-                } catch (err) {}
-
-                const groupMembers = contacts.filter(c => memberIds.includes(c.id) && c.source !== 'WhatsApp Group');
-                if (groupMembers.length > 0) {
-                    toast.info(`Broadcasting message to ${groupMembers.length} group members...`);
-                    groupMembers.forEach(async (member) => {
-                        try {
-                            await sendWhatsApp(member.id, member.phone, currentMsg);
-                        } catch (err) {
-                            console.error(`Group broadcast failed for ${member.name}:`, err);
-                        }
-                    });
-                }
+            if (editingMessageId) {
+                const idToUpdate = editingMessageId;
+                setEditingMessageId(null);
+                await updateWhatsAppMessage(idToUpdate, currentMsg);
             } else {
-                await sendWhatsApp(selectedContact.id, selectedContact.phone, currentMsg);
+                if ((selectedContact as any).source === 'WhatsApp Group') {
+                    // 1. Log group message in Supabase whatsapp_messages table
+                    const { error: dbErr } = await supabase.from('whatsapp_messages').insert([{
+                        lead_id: selectedContact.id,
+                        sender: 'user',
+                        content: currentMsg,
+                        status: 'sent'
+                    }]);
+                    if (dbErr) throw dbErr;
+
+                    // 2. Broadcast message to all group members
+                    let memberIds: string[] = [];
+                    try {
+                        const parsed = JSON.parse((selectedContact as any).notes || '{"members":[]}');
+                        memberIds = parsed.members || [];
+                    } catch (err) {}
+
+                    const groupMembers = contacts.filter(c => memberIds.includes(c.id) && c.source !== 'WhatsApp Group');
+                    if (groupMembers.length > 0) {
+                        toast.info(`Broadcasting message to ${groupMembers.length} group members...`);
+                        groupMembers.forEach(async (member) => {
+                            try {
+                                await sendWhatsApp(member.id, member.phone, currentMsg);
+                            } catch (err) {
+                                console.error(`Group broadcast failed for ${member.name}:`, err);
+                            }
+                        });
+                    }
+                } else {
+                    await sendWhatsApp(selectedContact.id, selectedContact.phone, currentMsg);
+                }
             }
         } catch (error) {
-            console.error("Failed to send WhatsApp message:", error);
+            console.error("Failed to handle WhatsApp message operation:", error);
+        }
+    };
+
+    const handleForwardMessage = async () => {
+        if (!forwardContent.trim() || selectedContactsForForward.length === 0) return;
+
+        try {
+            const targets = contacts.filter(c => selectedContactsForForward.includes(c.id));
+            toast.info(`Forwarding message to ${targets.length} contacts...`);
+            
+            for (const target of targets) {
+                try {
+                    await sendWhatsApp(target.id, target.phone, forwardContent);
+                } catch (err) {
+                    console.error(`Failed to forward message to ${target.name}:`, err);
+                }
+            }
+            
+            toast.success(`Message forwarded successfully.`);
+            setIsForwardOpen(false);
+            setSelectedContactsForForward([]);
+            setForwardContent('');
+        } catch (error) {
+            console.error("Failed to forward message:", error);
+            toast.error("Forwarding failed");
         }
     };
 
@@ -1287,6 +1364,53 @@ export function WhatsApp() {
                                                         matchesSearch ? "ring-2 ring-indigo-500/80 bg-indigo-50/20" : ""
                                                     )}
                                                 >
+                                                    {/* Hover Toolbar Actions */}
+                                                    <div className="absolute -top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 backdrop-blur-md px-1.5 py-0.5 rounded-lg shadow-md border border-slate-200/50 flex items-center gap-1.5 z-20">
+                                                        {isUser && !isImage && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setEditingMessageId(message.id);
+                                                                    setMessageInput(message.content);
+                                                                }}
+                                                                title="Edit Message"
+                                                                className="text-slate-500 hover:text-slate-800 transition-colors p-0.5"
+                                                            >
+                                                                <Edit className="h-3 w-3" />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setForwardContent(message.content);
+                                                                setSelectedContactsForForward([]);
+                                                                setForwardSearchTerm('');
+                                                                setIsForwardOpen(true);
+                                                            }}
+                                                            title="Forward Message"
+                                                            className="text-slate-500 hover:text-indigo-600 transition-colors p-0.5"
+                                                        >
+                                                            <Forward className="h-3.5 w-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                if (window.confirm("Are you sure you want to delete this message?")) {
+                                                                    try {
+                                                                        await deleteWhatsAppMessage(message.id);
+                                                                        setMessages(prev => prev.filter(m => m.id !== message.id));
+                                                                    } catch (err) {
+                                                                        console.error(err);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            title="Delete Message"
+                                                            className="text-slate-500 hover:text-rose-600 transition-colors p-0.5"
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+
                                                     {isImage ? (
                                                         <div className="my-1">
                                                             <img
@@ -1327,6 +1451,25 @@ export function WhatsApp() {
 
                         {/* Input Area */}
                         <div className="p-4 bg-white border-t border-slate-200 z-10 relative">
+                            {/* Editing Message Banner */}
+                            {editingMessageId && (
+                                <div className="flex items-center justify-between px-4 py-1.5 bg-indigo-50 border border-indigo-100/50 text-indigo-800 text-xs font-semibold rounded-xl mb-2.5 animate-in slide-in-from-bottom duration-200">
+                                    <div className="flex items-center gap-1.5">
+                                        <Edit className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
+                                        <span>Editing message...</span>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setEditingMessageId(null);
+                                            setMessageInput('');
+                                        }}
+                                        className="text-slate-400 hover:text-indigo-900 transition-colors p-0.5"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            )}
                             {/* Emoji Picker Popover */}
                             {isEmojiOpen && (
                                 <div className="absolute bottom-16 left-4 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-30 w-72 max-h-60 overflow-y-auto animate-in slide-in-from-bottom duration-200">
@@ -1565,6 +1708,89 @@ export function WhatsApp() {
                             className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold px-5"
                         >
                             Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Forward Message Dialog */}
+            <Dialog open={isForwardOpen} onOpenChange={setIsForwardOpen}>
+                <DialogContent className="sm:max-w-[460px] bg-white rounded-2xl border-slate-200 shadow-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black text-slate-800 uppercase tracking-tight">Forward Message</DialogTitle>
+                        <DialogDescription className="text-slate-500 font-medium text-xs">
+                            Select one or more contacts to forward this message to.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-3">
+                        <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl max-h-24 overflow-y-auto text-xs font-semibold text-slate-600 leading-relaxed italic">
+                            "{forwardContent}"
+                        </div>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                            <Input 
+                                placeholder="Search contacts..." 
+                                className="pl-9 bg-slate-100 border-none font-medium h-9 text-xs rounded-xl"
+                                value={forwardSearchTerm}
+                                onChange={(e) => setForwardSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Contacts</Label>
+                            <ScrollArea className="h-[180px] rounded-xl border border-slate-200 p-2 bg-slate-50">
+                                <div className="space-y-1">
+                                    {contacts
+                                        .filter(c => 
+                                            (c as any).source !== 'WhatsApp Group' && 
+                                            (c.name.toLowerCase().includes(forwardSearchTerm.toLowerCase()) || c.phone.includes(forwardSearchTerm))
+                                        )
+                                        .map((contact) => (
+                                            <button
+                                                key={contact.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedContactsForForward(prev => 
+                                                        prev.includes(contact.id)
+                                                            ? prev.filter(id => id !== contact.id)
+                                                            : [...prev, contact.id]
+                                                    );
+                                                }}
+                                                className={cn(
+                                                    "flex items-center gap-3 p-2.5 hover:bg-slate-100/80 rounded-lg text-left w-full transition-colors",
+                                                    selectedContactsForForward.includes(contact.id) ? "bg-indigo-50/50" : ""
+                                                )}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedContactsForForward.includes(contact.id)}
+                                                    onChange={() => {}}
+                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                />
+                                                <div className="relative">
+                                                    <Avatar className="h-8 w-8">
+                                                        <AvatarImage src={contact.avatar} />
+                                                        <AvatarFallback className="text-xs font-bold">{contact.name[0]}</AvatarFallback>
+                                                    </Avatar>
+                                                </div>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <span className="text-xs font-bold text-slate-800 truncate block">{contact.name}</span>
+                                                    <span className="text-[9px] text-slate-400 font-bold block">{contact.phone}</span>
+                                                </div>
+                                            </button>
+                                        ))
+                                    }
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="ghost" onClick={() => setIsForwardOpen(false)} className="rounded-xl font-bold text-slate-500 hover:bg-slate-100">Cancel</Button>
+                        <Button 
+                            disabled={selectedContactsForForward.length === 0} 
+                            onClick={handleForwardMessage}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold px-5"
+                        >
+                            Forward ({selectedContactsForForward.length})
                         </Button>
                     </DialogFooter>
                 </DialogContent>
