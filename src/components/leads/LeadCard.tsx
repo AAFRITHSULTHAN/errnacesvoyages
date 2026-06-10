@@ -6,13 +6,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Phone, Mail, Euro, Calendar, Globe, Map } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getLeadRevenue } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { useAppStore } from '@/store';
 
 interface LeadCardProps {
     lead: Lead;
 }
 
 export function LeadCard({ lead }: LeadCardProps) {
+    const navigate = useNavigate();
+    const { tours } = useAppStore();
     const {
         attributes,
         listeners,
@@ -29,12 +33,22 @@ export function LeadCard({ lead }: LeadCardProps) {
         zIndex: isDragging ? 10 : 1,
     };
 
+    const handleClick = (e: React.MouseEvent) => {
+        if (isDragging) return;
+        const target = e.target as HTMLElement;
+        if (target.closest('button') || target.closest('a')) {
+            return;
+        }
+        navigate(`/leads/${lead.id}`);
+    };
+
     return (
         <Card
             ref={setNodeRef}
             style={style}
             {...attributes}
             {...listeners}
+            onClick={handleClick}
             className={cn(
                 "cursor-grab active:cursor-grabbing group border-slate-200/60 shadow-md bg-white/80 backdrop-blur-sm overflow-hidden relative",
                 "transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5 hover:border-indigo-200/50 hover:bg-white",
@@ -84,7 +98,10 @@ export function LeadCard({ lead }: LeadCardProps) {
                                 <Euro className="w-3 h-3 text-emerald-600" />
                             </div>
                             <span className="text-[13px] font-extrabold text-slate-900 tracking-tight">
-                                {lead.budget ? lead.budget.toLocaleString() : '0'}
+                                {(() => {
+                                    const revenue = getLeadRevenue(lead, tours);
+                                    return revenue ? revenue.toLocaleString() : '0';
+                                })()}
                             </span>
                         </div>
                         <span className="text-[8px] uppercase tracking-tighter font-bold text-slate-400/80">Budget</span>

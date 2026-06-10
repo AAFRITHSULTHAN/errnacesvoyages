@@ -34,7 +34,10 @@ import {
     X,
     MapPin,
     Clock,
-    User
+    User,
+    Shield,
+    Calendar,
+    Plane
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -181,6 +184,33 @@ export function LeadDetails() {
         if (!lead || !lead.assigned_staff_id) return null;
         return staff.find(s => s.id === lead.assigned_staff_id);
     }, [staff, lead]);
+
+    const parsedNotes = useMemo(() => {
+        let parsed = {
+            notes: '',
+            passport_details: '',
+            dob: '',
+            tour_departure: '',
+            tour_arrival: ''
+        };
+        try {
+            if (lead?.notes) {
+                const obj = JSON.parse(lead.notes);
+                if (obj && typeof obj === 'object') {
+                    parsed = {
+                        notes: obj.notes || '',
+                        passport_details: obj.passport_details || '',
+                        dob: obj.dob || '',
+                        tour_departure: obj.tour_departure || '',
+                        tour_arrival: obj.tour_arrival || '',
+                    };
+                }
+            }
+        } catch (_) {
+            parsed.notes = lead?.notes || '';
+        }
+        return parsed;
+    }, [lead?.notes]);
 
     if (!lead) {
         return (
@@ -427,7 +457,82 @@ export function LeadDetails() {
                             <div className="md:col-span-2 pt-2">
                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Lead Notes & Requirements</p>
                                 <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 font-medium text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
-                                    {lead.notes || 'No notes added yet. Click edit to add details.'}
+                                    {parsedNotes.notes || 'No notes added yet. Click edit to add details.'}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Client & Travel Details Card */}
+                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/70 backdrop-blur-sm">
+                        <CardHeader className="border-b border-slate-100/50 pb-4">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                <Plane className="h-4 w-4 text-indigo-500" />
+                                Client & Travel Details
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+                            <div className="flex items-center gap-3.5">
+                                <div className="h-10 w-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0">
+                                    <Shield className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">Passport Details</p>
+                                    <p className="text-sm font-bold text-slate-700 mt-1">{parsedNotes.passport_details || 'Not Specified'}</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3.5">
+                                <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 flex-shrink-0">
+                                    <Calendar className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">Date of Birth</p>
+                                    <p className="text-sm font-bold text-slate-700 mt-1">
+                                        {parsedNotes.dob ? (() => {
+                                            try {
+                                                return format(parseISO(parsedNotes.dob), 'MMM d, yyyy');
+                                            } catch (_) {
+                                                return parsedNotes.dob;
+                                            }
+                                        })() : 'Not Specified'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3.5">
+                                <div className="h-10 w-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 flex-shrink-0">
+                                    <Plane className="h-4 w-4 rotate-45" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">Departure Date</p>
+                                    <p className="text-sm font-bold text-slate-700 mt-1">
+                                        {parsedNotes.tour_departure ? (() => {
+                                            try {
+                                                return format(parseISO(parsedNotes.tour_departure), 'MMM d, yyyy');
+                                            } catch (_) {
+                                                return parsedNotes.tour_departure;
+                                            }
+                                        })() : 'Not Specified'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3.5">
+                                <div className="h-10 w-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 flex-shrink-0">
+                                    <Plane className="h-4 w-4 -rotate-45" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">Arrival Date</p>
+                                    <p className="text-sm font-bold text-slate-700 mt-1">
+                                        {parsedNotes.tour_arrival ? (() => {
+                                            try {
+                                                return format(parseISO(parsedNotes.tour_arrival), 'MMM d, yyyy');
+                                            } catch (_) {
+                                                return parsedNotes.tour_arrival;
+                                            }
+                                        })() : 'Not Specified'}
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>

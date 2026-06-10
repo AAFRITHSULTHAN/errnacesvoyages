@@ -22,3 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment & Credentials
+.env
+.env.*
+!.env.example
+
+# Temporary & Local files
+supabase/.temp/
+scratch/
+delete-leads-direct.js
+get-messaging-services.js
+get-recent-messages.js
+get-webhook-config.js
+get-whatsapp-senders.js
+test-incoming-webhook.js
+test_all_queries.js
+test_staff_rls.js

@@ -11,8 +11,9 @@ import { Edit, Trash2, Mail, Phone, Calendar, Hash, MessageSquare } from "lucide
 import type { Lead } from "@/types";
 import { format, parseISO } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { cn, getLeadRevenue } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { useAppStore } from "@/store";
 
 interface LeadsTableProps {
     leads: Lead[];
@@ -23,6 +24,7 @@ interface LeadsTableProps {
 
 export function LeadsTable({ leads, onEdit, onDelete, onWhatsApp }: LeadsTableProps) {
     const navigate = useNavigate();
+    const { tours } = useAppStore();
     const getStatusStyles = (status: string) => {
         switch (status) {
             case 'new': return 'bg-rose-50 text-rose-700 border-rose-100';
@@ -123,18 +125,21 @@ export function LeadsTable({ leads, onEdit, onDelete, onWhatsApp }: LeadsTablePr
                                         <span className="text-[13px] font-black text-slate-700 truncate max-w-[150px]">
                                             {lead.tour_interest || 'Custom Tour'}
                                         </span>
-                                        {lead.budget ? (
-                                            <span className="text-[11px] font-black text-emerald-600 mt-0.5 flex items-center gap-1">
-                                                <Hash className="h-2.5 w-2.5 opacity-70" />
-                                                €{lead.budget.toLocaleString()}
-                                            </span>
-                                        ) : (
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Not Specified</span>
-                                        )}
+                                        {(() => {
+                                            const revenue = getLeadRevenue(lead, tours);
+                                            return revenue ? (
+                                                <span className="text-[11px] font-black text-emerald-600 mt-0.5 flex items-center gap-1">
+                                                    <Hash className="h-2.5 w-2.5 opacity-70" />
+                                                    €{revenue.toLocaleString()}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Not Specified</span>
+                                            );
+                                        })()}
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-right pr-8">
-                                    <div className="actions-container flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                    <div className="actions-container flex justify-end gap-1">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onWhatsApp(lead); }}
                                             className="h-9 w-9 p-0 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center justify-center transition-colors"

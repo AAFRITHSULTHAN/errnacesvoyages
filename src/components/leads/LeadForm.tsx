@@ -34,6 +34,10 @@ const leadSchema = z.object({
     budget: z.number().optional(),
     assigned_staff_id: z.string().optional(),
     notes: z.string().optional(),
+    passport_details: z.string().optional(),
+    dob: z.string().optional(),
+    tour_departure: z.string().optional(),
+    tour_arrival: z.string().optional(),
 });
 
 type LeadFormValues = z.infer<typeof leadSchema>;
@@ -64,7 +68,32 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             tour_interest: initialData.tour_interest || '',
             budget: initialData.budget,
             assigned_staff_id: initialData.assigned_staff_id || '',
-            notes: initialData.notes || '',
+            ...(() => {
+                let parsed = {
+                    notes: '',
+                    passport_details: '',
+                    dob: '',
+                    tour_departure: '',
+                    tour_arrival: ''
+                };
+                try {
+                    if (initialData.notes) {
+                        const obj = JSON.parse(initialData.notes);
+                        if (obj && typeof obj === 'object') {
+                            parsed = {
+                                notes: obj.notes || '',
+                                passport_details: obj.passport_details || '',
+                                dob: obj.dob || '',
+                                tour_departure: obj.tour_departure || '',
+                                tour_arrival: obj.tour_arrival || '',
+                            };
+                        }
+                    }
+                } catch (_) {
+                    parsed.notes = initialData.notes || '';
+                }
+                return parsed;
+            })()
         } : {
             name: '',
             email: '',
@@ -75,6 +104,10 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             budget: undefined,
             assigned_staff_id: '',
             notes: '',
+            passport_details: '',
+            dob: '',
+            tour_departure: '',
+            tour_arrival: '',
         },
     });
 
@@ -93,10 +126,26 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
     }, [tourInterest, tours, form]);
 
     const handleSubmit = (values: LeadFormValues) => {
-        const payload = { ...values };
+        const payload = {
+            ...values,
+            notes: JSON.stringify({
+                notes: values.notes || '',
+                passport_details: values.passport_details || '',
+                dob: values.dob || '',
+                tour_departure: values.tour_departure || '',
+                tour_arrival: values.tour_arrival || '',
+            })
+        };
         if (!payload.assigned_staff_id || payload.assigned_staff_id === 'unassigned' || payload.assigned_staff_id === '') {
             payload.assigned_staff_id = undefined;
         }
+        
+        // Remove individual virtual fields so they don't go to Supabase as columns
+        delete (payload as any).passport_details;
+        delete (payload as any).dob;
+        delete (payload as any).tour_departure;
+        delete (payload as any).tour_arrival;
+
         onSubmit(payload);
     };
 
@@ -252,6 +301,66 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
                             </FormItem>
                         )}
                     />
+                </div>
+
+                <div className="border-t border-slate-100 my-4 pt-4">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Client & Travel Details</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField<LeadFormValues>
+                            control={form.control}
+                            name="passport_details"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Passport Details</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Passport number & expiry" {...field} value={field.value || ''} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField<LeadFormValues>
+                            control={form.control}
+                            name="dob"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Date of Birth</FormLabel>
+                                    <FormControl>
+                                        <Input type="date" {...field} value={field.value || ''} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                        <FormField<LeadFormValues>
+                            control={form.control}
+                            name="tour_departure"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Departure Date</FormLabel>
+                                    <FormControl>
+                                        <Input type="date" {...field} value={field.value || ''} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField<LeadFormValues>
+                            control={form.control}
+                            name="tour_arrival"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Arrival Date</FormLabel>
+                                    <FormControl>
+                                        <Input type="date" {...field} value={field.value || ''} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
                 </div>
 
                 <FormField<LeadFormValues>

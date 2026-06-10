@@ -8,7 +8,8 @@ import {
     BarChart3,
     LayoutGrid,
     LogOut,
-    Menu
+    Menu,
+    Contact
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -25,6 +26,7 @@ export function Sidebar() {
     const NAV_ITEMS = [
         { label: t('dashboard'), icon: LayoutDashboard, href: '/' },
         { label: t('leads'), icon: Users, href: '/leads' },
+        { label: t('contacts'), icon: Contact, href: '/contacts' },
         { label: t('pipeline'), icon: LayoutGrid, href: '/pipeline' },
         { label: t('tourPackages'), icon: Map, href: '/tours' },
         { label: t('whatsapp'), icon: MessageSquare, href: '/whatsapp' },

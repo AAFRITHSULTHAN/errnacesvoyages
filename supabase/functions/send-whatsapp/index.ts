@@ -533,6 +533,177 @@ serve(async (req: Request) => {
     // Outgoing message or custom action (JSON request from frontend)
     const body = await req.json()
 
+    if (body.action === 'check_birthdays') {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+      const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
+      const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
+      const TWILIO_WHATSAPP_NUMBER = Deno.env.get('TWILIO_WHATSAPP_NUMBER') || 'whatsapp:+17752555600'
+
+      if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+        throw new Error('Twilio credentials not configured')
+      }
+
+      // Fetch all active/non-deleted leads
+      const { data: leads, error: leadsError } = await supabase.from('leads').select('*')
+      if (leadsError) {
+        throw leadsError
+      }
+
+      // Get current date/month in India/Kolkata timezone (UTC+5:30)
+      const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }))
+      const currentMonth = today.getMonth() + 1
+      const currentDate = today.getDate()
+
+      const yyyy = today.getFullYear()
+      const mm = String(today.getMonth() + 1).padStart(2, '0')
+      const dd = String(today.getDate()).padStart(2, '0')
+      const todayISOOnlyDate = `${yyyy}-${mm}-${dd}` // "YYYY-MM-DD"
+      const todayStartISO = `${yyyy}-${mm}-${dd}T00:00:00+05:30`
+
+      const results = []
+
+      for (const lead of leads) {
+        if (!lead.notes || !lead.phone || lead.notes === '[DELETED]') continue
+
+        let dobStr = ''
+        let departureStr = ''
+        let arrivalStr = ''
+        try {
+          const parsed = JSON.parse(lead.notes)
+          if (parsed) {
+            if (parsed.dob) dobStr = parsed.dob // YYYY-MM-DD
+            if (parsed.tour_departure) departureStr = parsed.tour_departure // YYYY-MM-DD
+            if (parsed.tour_arrival) arrivalStr = parsed.tour_arrival // YYYY-MM-DD
+          }
+        } catch (_) {
+          continue
+        }
+
+        // Helper to lazy load existing messages sent today to avoid redundant DB queries
+        let existingMessages: any[] | null = null
+        const getExistingMessages = async () => {
+          if (existingMessages !== null) return existingMessages
+          const { data, error } = await supabase
+            .from('whatsapp_messages')
+            .select('*')
+            .eq('lead_id', lead.id)
+            .eq('sender', 'user')
+            .gte('created_at', todayStartISO)
+          
+          if (error) {
+            console.error(`[Travel Job] Error checking existing messages for ${lead.name}:`, error.message)
+            existingMessages = []
+          } else {
+            existingMessages = data || []
+          }
+          return existingMessages
+        }
+
+        // 1. Check Birthday
+        if (dobStr) {
+          const dobParts = dobStr.split('-')
+          if (dobParts.length === 3) {
+            const dobMonth = parseInt(dobParts[1], 10)
+            const dobDate = parseInt(dobParts[2], 10)
+
+            if (dobMonth === currentMonth && dobDate === currentDate) {
+              const msgs = await getExistingMessages()
+              const alreadySent = msgs.some((m: any) => m.content.includes('Happy Birthday'))
+
+              if (!alreadySent) {
+                const wishMessage = `Happy Birthday ${lead.name}! 🎂🎉 The team at Errances Voyages wishes you a wonderful day and many beautiful travels ahead! ✈️`
+                try {
+                  console.log(`[Birthday Job] Sending birthday wish via Twilio to ${lead.name}...`)
+                  const sid = await sendTwilioWhatsApp(lead.phone, wishMessage, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER)
+                  await supabase.from('whatsapp_messages').insert({
+                    lead_id: lead.id,
+                    sender: 'user',
+                    content: wishMessage,
+                    status: 'sent'
+                  })
+                  results.push({ lead: lead.name, type: 'birthday', status: 'success', sid })
+                } catch (sendErr: any) {
+                  console.error(`[Birthday Job] Failed to send wish to ${lead.name}:`, sendErr)
+                  results.push({ lead: lead.name, type: 'birthday', status: 'error', error: sendErr.message || String(sendErr) })
+                }
+              } else {
+                results.push({ lead: lead.name, type: 'birthday', status: 'already_sent' })
+              }
+            }
+          }
+        }
+
+        // 2. Check Departure Date
+        if (departureStr && departureStr === todayISOOnlyDate) {
+          const msgs = await getExistingMessages()
+          const alreadySent = msgs.some((m: any) => 
+            m.content.includes('wonderful journey') || 
+            m.content.includes('safe flight')
+          )
+
+          if (!alreadySent) {
+            const departureMessage = `Wishing you a wonderful journey, ${lead.name}! ✈️ The team at Errances Voyages hopes you have a safe flight and an amazing trip starting today! 🌍`
+            try {
+              console.log(`[Departure Job] Sending departure wish via Twilio to ${lead.name}...`)
+              const sid = await sendTwilioWhatsApp(lead.phone, departureMessage, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER)
+              await supabase.from('whatsapp_messages').insert({
+                lead_id: lead.id,
+                sender: 'user',
+                content: departureMessage,
+                status: 'sent'
+              })
+              results.push({ lead: lead.name, type: 'departure', status: 'success', sid })
+            } catch (sendErr: any) {
+              console.error(`[Departure Job] Failed to send departure message to ${lead.name}:`, sendErr)
+              results.push({ lead: lead.name, type: 'departure', status: 'error', error: sendErr.message || String(sendErr) })
+            }
+          } else {
+            results.push({ lead: lead.name, type: 'departure', status: 'already_sent' })
+          }
+        }
+
+        // 3. Check Arrival Date
+        if (arrivalStr && arrivalStr === todayISOOnlyDate) {
+          const msgs = await getExistingMessages()
+          const alreadySent = msgs.some((m: any) => 
+            m.content.includes('Welcome home') || 
+            m.content.includes('fantastic travel')
+          )
+
+          if (!alreadySent) {
+            const arrivalMessage = `Welcome home, ${lead.name}! 🏡 We hope you had a fantastic travel experience with Errances Voyages. We would love to hear your feedback and see your beautiful pictures! 📸`
+            try {
+              console.log(`[Arrival Job] Sending arrival welcome back via Twilio to ${lead.name}...`)
+              const sid = await sendTwilioWhatsApp(lead.phone, arrivalMessage, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER)
+              await supabase.from('whatsapp_messages').insert({
+                lead_id: lead.id,
+                sender: 'user',
+                content: arrivalMessage,
+                status: 'sent'
+              })
+              results.push({ lead: lead.name, type: 'arrival', status: 'success', sid })
+            } catch (sendErr: any) {
+              console.error(`[Arrival Job] Failed to send arrival message to ${lead.name}:`, sendErr)
+              results.push({ lead: lead.name, type: 'arrival', status: 'error', error: sendErr.message || String(sendErr) })
+            }
+          } else {
+            results.push({ lead: lead.name, type: 'arrival', status: 'already_sent' })
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, results }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+
     // Handle delete_lead action using service role to bypass RLS
     if (body.action === 'debug_db') {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''

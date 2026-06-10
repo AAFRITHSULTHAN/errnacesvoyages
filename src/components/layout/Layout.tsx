@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useAppStore } from '@/store';
+import { triggerBirthdayWishesCheck } from '@/lib/api';
 
 export function Layout() {
     const { fetchLeads, fetchTours } = useAppStore();
@@ -10,6 +11,10 @@ export function Layout() {
         fetchLeads();
         fetchTours();
     }, [fetchLeads, fetchTours]);
+
+    useEffect(() => {
+        triggerBirthdayWishesCheck().catch(err => console.error('Failed to trigger birthday wishes check:', err));
+    }, []);
 
     return (
         <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">

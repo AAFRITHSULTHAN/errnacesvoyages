@@ -273,6 +273,9 @@ async function startWhatsApp() {
             console.log('WhatsApp connection successfully opened!');
             connectionStatus = 'open';
             qrCodeDataUrl = '';
+            
+            // Run travel messages check 15 seconds after connecting
+            setTimeout(checkAndSendTravelMessages, 15000);
         }
     });
 
@@ -357,9 +360,179 @@ app.post('/whatsapp-api/send', async (req, res) => {
     }
 });
 
+// Travel Messages Checker (Birthday, Departure, Arrival)
+async function checkAndSendTravelMessages() {
+    console.log('[Travel Job] Checking birthdays and travel dates...');
+    try {
+        if (connectionStatus !== 'open' || !sock) {
+            console.log('[Travel Job] WhatsApp is not connected. Skipping check.');
+            return;
+        }
+
+        // Fetch all leads
+        const { data: leads, error: leadsError } = await supabase
+            .from('leads')
+            .select('*');
+
+        if (leadsError) {
+            console.error('[Travel Job] Error fetching leads:', leadsError.message);
+            return;
+        }
+
+        // Get current date/month in India/Kolkata timezone (UTC+5:30)
+        const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+        const currentMonth = today.getMonth() + 1;
+        const currentDate = today.getDate();
+
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayISOOnlyDate = `${yyyy}-${mm}-${dd}`;
+        const todayStartISO = `${yyyy}-${mm}-${dd}T00:00:00+05:30`;
+
+        for (const lead of leads) {
+            if (!lead.notes || !lead.phone || lead.notes === '[DELETED]') continue;
+
+            let dobStr = '';
+            let departureStr = '';
+            let arrivalStr = '';
+            try {
+                const parsed = JSON.parse(lead.notes);
+                if (parsed) {
+                    if (parsed.dob) dobStr = parsed.dob;
+                    if (parsed.tour_departure) departureStr = parsed.tour_departure;
+                    if (parsed.tour_arrival) arrivalStr = parsed.tour_arrival;
+                }
+            } catch (_) {
+                continue;
+            }
+
+            // Helper to lazy load existing messages sent today to avoid redundant DB queries
+            let existingMessages = null;
+            const getExistingMessages = async () => {
+                if (existingMessages !== null) return existingMessages;
+                const { data, error } = await supabase
+                    .from('whatsapp_messages')
+                    .select('*')
+                    .eq('lead_id', lead.id)
+                    .eq('sender', 'user')
+                    .gte('created_at', todayStartISO);
+                
+                if (error) {
+                    console.error(`[Travel Job] Error checking existing messages for ${lead.name}:`, error.message);
+                    existingMessages = [];
+                } else {
+                    existingMessages = data || [];
+                }
+                return existingMessages;
+            };
+
+            // Format phone number to JID helper
+            const getTargetJid = () => {
+                let targetJid = lead.phone;
+                if (!targetJid.includes('@')) {
+                    const clean = targetJid.replace(/\D/g, '');
+                    return clean.includes('-') || clean.length > 15 
+                        ? `${clean}@g.us` 
+                        : `${clean}@s.whatsapp.net`;
+                }
+                return targetJid;
+            };
+
+            // 1. Check Birthday
+            if (dobStr) {
+                const dobParts = dobStr.split('-');
+                if (dobParts.length === 3) {
+                    const dobMonth = parseInt(dobParts[1], 10);
+                    const dobDate = parseInt(dobParts[2], 10);
+
+                    if (dobMonth === currentMonth && dobDate === currentDate) {
+                        const msgs = await getExistingMessages();
+                        const alreadySent = msgs.some(m => m.content.includes('Happy Birthday'));
+
+                        if (!alreadySent) {
+                            const wishMessage = `Happy Birthday ${lead.name}! 🎂🎉 The team at Errances Voyages wishes you a wonderful day and many beautiful travels ahead! ✈️`;
+                            try {
+                                console.log(`[Birthday Job] Sending birthday wish to ${lead.name}...`);
+                                const targetJid = getTargetJid();
+                                await sock.sendMessage(targetJid, { text: wishMessage });
+                                await supabase.from('whatsapp_messages').insert({
+                                    lead_id: lead.id,
+                                    sender: 'user',
+                                    content: wishMessage,
+                                    status: 'sent'
+                                });
+                            } catch (sendErr) {
+                                console.error(`[Birthday Job] Failed to send wish to ${lead.name}:`, sendErr);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Check Departure Date
+            if (departureStr && departureStr === todayISOOnlyDate) {
+                const msgs = await getExistingMessages();
+                const alreadySent = msgs.some(m => 
+                    m.content.includes('wonderful journey') || 
+                    m.content.includes('safe flight')
+                );
+
+                if (!alreadySent) {
+                    const departureMessage = `Wishing you a wonderful journey, ${lead.name}! ✈️ The team at Errances Voyages hopes you have a safe flight and an amazing trip starting today! 🌍`;
+                    try {
+                        console.log(`[Departure Job] Sending departure wish to ${lead.name}...`);
+                        const targetJid = getTargetJid();
+                        await sock.sendMessage(targetJid, { text: departureMessage });
+                        await supabase.from('whatsapp_messages').insert({
+                            lead_id: lead.id,
+                            sender: 'user',
+                            content: departureMessage,
+                            status: 'sent'
+                        });
+                    } catch (sendErr) {
+                        console.error(`[Departure Job] Failed to send departure message to ${lead.name}:`, sendErr);
+                    }
+                }
+            }
+
+            // 3. Check Arrival Date
+            if (arrivalStr && arrivalStr === todayISOOnlyDate) {
+                const msgs = await getExistingMessages();
+                const alreadySent = msgs.some(m => 
+                    m.content.includes('Welcome home') || 
+                    m.content.includes('fantastic travel')
+                );
+
+                if (!alreadySent) {
+                    const arrivalMessage = `Welcome home, ${lead.name}! 🏡 We hope you had a fantastic travel experience with Errances Voyages. We would love to hear your feedback and see your beautiful pictures! 📸`;
+                    try {
+                        console.log(`[Arrival Job] Sending arrival welcome back to ${lead.name}...`);
+                        const targetJid = getTargetJid();
+                        await sock.sendMessage(targetJid, { text: arrivalMessage });
+                        await supabase.from('whatsapp_messages').insert({
+                            lead_id: lead.id,
+                            sender: 'user',
+                            content: arrivalMessage,
+                            status: 'sent'
+                        });
+                    } catch (sendErr) {
+                        console.error(`[Arrival Job] Failed to send arrival message to ${lead.name}:`, sendErr);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Travel Job] Unexpected error:', err);
+    }
+}
+
 // Express Server
 const PORT = 3001;
 app.listen(PORT, () => {
     console.log(`Local WhatsApp Web sync server listening on port ${PORT}`);
     startWhatsApp();
+    
+    // Check travel messages (birthday, departure, arrival) every hour (3600000 ms)
+    setInterval(checkAndSendTravelMessages, 60 * 60 * 1000);
 });

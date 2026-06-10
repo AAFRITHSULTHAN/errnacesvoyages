@@ -84,6 +84,9 @@ export const useAppStore = create<AppState>((set, get) => ({
                 isLoading: false
             }));
             toast.success('Lead added successfully');
+            
+            // Check if today matches any birthday/travel event for the new lead
+            api.triggerBirthdayWishesCheck().catch(err => console.error('Failed to trigger birthday check on lead add:', err));
 
             // Send welcome template via WhatsApp if phone is present and not from CSV Import
             if (newLead.phone && newLead.source !== 'CSV Import') {
@@ -154,6 +157,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             try {
                 await api.updateLead(id, updates);
                 toast.success('Lead updated successfully');
+                
+                // Check if today matches any birthday/travel event for the updated lead
+                api.triggerBirthdayWishesCheck().catch(err => console.error('Failed to trigger birthday check on lead update:', err));
             } catch (error: any) {
                 // If FK constraint error on assigned_staff_id, save without it and notify user
                 const isFkError = error?.code === '23503' ||

@@ -12,6 +12,7 @@ import { TourDetails } from '@/pages/tours/TourDetails';
 import { TourForm } from '@/pages/tours/TourForm';
 import { WhatsApp } from '@/pages/whatsapp/WhatsApp';
 import { Leads } from '@/pages/leads/Leads';
+import { Contacts } from '@/pages/contacts/Contacts';
 import { LeadDetails } from '@/pages/leads/LeadDetails';
 import { Pipeline } from '@/pages/pipeline/Pipeline';
 import { Analytics } from '@/pages/analytics/Analytics';
@@ -49,6 +50,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="pipeline" element={<Pipeline />} />
         <Route path="leads" element={<Leads />} />
+        <Route path="contacts" element={<Contacts />} />
         <Route path="leads/:id" element={<LeadDetails />} />
         <Route path="tours" element={<TourList />} />
         <Route path="tours/new" element={<TourForm />} />

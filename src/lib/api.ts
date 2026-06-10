@@ -360,3 +360,33 @@ export async function updateWhatsAppMessage(id: string, content: string) {
     if (error) throw error;
     return data;
 }
+
+export async function triggerBirthdayWishesCheck() {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || supabaseAnonKey;
+
+    try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'apikey': supabaseAnonKey,
+            },
+            body: JSON.stringify({ action: 'check_birthdays' }),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error('triggerBirthdayWishesCheck failed response:', errText);
+        } else {
+            const result = await response.json();
+            console.log('triggerBirthdayWishesCheck complete:', result);
+        }
+    } catch (err) {
+        console.error('Error invoking triggerBirthdayWishesCheck:', err);
+    }
+}
