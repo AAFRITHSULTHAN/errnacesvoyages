@@ -126,9 +126,17 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
     }, [tourInterest, tours, form]);
 
     const handleSubmit = (values: LeadFormValues) => {
+        let existingNotesObj = {};
+        try {
+            if (initialData?.notes) {
+                existingNotesObj = JSON.parse(initialData.notes);
+            }
+        } catch (_) {}
+
         const payload = {
             ...values,
             notes: JSON.stringify({
+                ...existingNotesObj,
                 notes: values.notes || '',
                 passport_details: values.passport_details || '',
                 dob: values.dob || '',

@@ -89,7 +89,15 @@ export const useAppStore = create<AppState>((set, get) => ({
             api.triggerBirthdayWishesCheck().catch(err => console.error('Failed to trigger birthday check on lead add:', err));
 
             // Send welcome template via WhatsApp if phone is present and not from CSV Import
-            if (newLead.phone && newLead.source !== 'CSV Import') {
+            let isContactOnly = false;
+            try {
+                if (newLead.notes) {
+                    const parsed = JSON.parse(newLead.notes);
+                    isContactOnly = parsed && parsed.is_contact === true;
+                }
+            } catch (_) {}
+
+            if (newLead.phone && newLead.source !== 'CSV Import' && !isContactOnly) {
                 try {
                     await get().sendWhatsApp(
                         newLead.id,

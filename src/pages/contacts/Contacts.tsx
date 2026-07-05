@@ -18,13 +18,30 @@ import { KPICards } from '@/components/dashboard/KPICards';
 import { useI18n } from '@/i18n';
 import { WhatsAppModal } from '@/components/leads/WhatsAppModal';
 
-import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 import { getLeadRevenue } from '@/lib/utils';
 
 export function Contacts() {
-    const { fetchLeads, addLead, updateLead, deleteLead, tours } = useAppStore();
-    const allLeads = useFilteredLeads();
-    const leads = useMemo(() => allLeads.filter(l => l.status === 'converted'), [allLeads]);
+    const { fetchLeads, addLead, updateLead, deleteLead, tours, leads: rawLeads } = useAppStore();
+    const leads = useMemo(() => rawLeads.filter(l => {
+        let isContactOnly = false;
+        try {
+            if (l.notes) {
+                const parsed = JSON.parse(l.notes);
+                isContactOnly = parsed && parsed.is_contact === true;
+            }
+        } catch (_) {}
+
+        if (isContactOnly) return true;
+
+        return (
+            l.status === 'converted' &&
+            l.source !== 'Staff' && 
+            l.source !== 'WhatsApp' && 
+            l.source !== 'WhatsApp Sync' && 
+            l.source !== 'WhatsApp Web' && 
+            l.source !== 'WhatsApp Group'
+        );
+    }), [rawLeads]);
     
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | undefined>(undefined);
@@ -122,7 +139,14 @@ export function Contacts() {
                         source: leadData.source || 'CSV Import',
                         budget: leadData.budget || 0,
                         tour_interest: leadData.tour_interest || '',
-                        notes: leadData.notes || ''
+                        notes: JSON.stringify({
+                            notes: leadData.notes || '',
+                            passport_details: '',
+                            dob: '',
+                            tour_departure: '',
+                            tour_arrival: '',
+                            is_contact: true
+                        })
                     });
                     importedCount++;
                 }
@@ -157,14 +181,28 @@ export function Contacts() {
     };
 
     const handleSaveContact = (data: any) => {
+        let notesObj = { notes: '', passport_details: '', dob: '', tour_departure: '', tour_arrival: '', is_contact: true };
+        try {
+            if (data.notes) {
+                notesObj = { ...notesObj, ...JSON.parse(data.notes) };
+            }
+        } catch (_) {
+            notesObj.notes = data.notes || '';
+        }
+        notesObj.is_contact = true;
+        const updatedData = {
+            ...data,
+            notes: JSON.stringify(notesObj)
+        };
+
         // If it was editing a contact or adding a new one
         if (selectedLead && selectedLead.id) {
-            updateLead(selectedLead.id, data);
+            updateLead(selectedLead.id, updatedData);
         } else {
             addLead({
                 id: uuidv4(),
                 created_at: new Date().toISOString(),
-                ...data
+                ...updatedData
             });
         }
         setIsDialogOpen(false);
