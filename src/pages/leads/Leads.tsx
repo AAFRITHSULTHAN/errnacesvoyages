@@ -20,44 +20,39 @@ import { WhatsAppModal } from '@/components/leads/WhatsAppModal';
 
 import { useFilteredLeads } from '@/hooks/useFilteredLeads';
 import { getLeadRevenue } from '@/lib/utils';
+import { parseCSVContent } from '@/lib/csvParser';
 
 export function Leads() {
     const { fetchLeads, addLead, updateLead, deleteLead, tours } = useAppStore();
     const leads = useFilteredLeads();
+    const { t } = useI18n();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | undefined>(undefined);
     const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
-    const { t } = useI18n();
 
     useEffect(() => {
         fetchLeads();
     }, [fetchLeads]);
 
-    // Calculate KPIs
+    // KPI calculation
     const kpis = useMemo(() => {
         const totalLeads = leads.length;
-        const convertedLeads = leads.filter(l => l.status === 'converted').length;
-        const conversionRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0.0';
-        const totalRevenue = leads
-            .filter(l => l.status === 'converted')
-            .reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
+        const totalValue = leads.reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
+        const avgBudget = totalLeads > 0 ? Math.round(totalValue / totalLeads) : 0;
 
         return [
             { label: t('totalLeads'), value: totalLeads.toString(), icon: 'Users' },
-            { label: t('convertedCol'), value: convertedLeads.toString(), icon: 'UserCheck' },
-            { label: t('conversionRate'), value: `${conversionRate}%`, icon: 'TrendingUp' },
-            { label: t('revenue'), value: `€${totalRevenue.toLocaleString()}`, icon: 'Euro' },
+            { label: t('totalValue'), value: `€${totalValue.toLocaleString()}`, icon: 'Euro' },
+            { label: t('avgBudget'), value: `€${avgBudget.toLocaleString()}`, icon: 'TrendingUp' },
         ];
-    }, [leads, t]);
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    }, [leads, tours, t]);
 
     const handleExport = () => {
-        const headers = ['id', 'name', 'email', 'phone', 'status', 'source', 'budget', 'tour_interest'];
+        const headers = ['Name', 'Email', 'Phone', 'Status', 'Source', 'Budget', 'Tour Interest'];
         const csvContent = [
             headers.join(','),
             ...leads.map(lead => [
-                lead.id,
                 `"${lead.name}"`,
                 lead.email,
                 lead.phone,
@@ -90,43 +85,27 @@ export function Leads() {
         reader.onload = async (e) => {
             const content = e.target?.result as string;
             try {
-                const lines = content.split('\n');
-                if (lines.length < 2) throw new Error('File is empty or invalid');
-
-                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
-                const records = lines.slice(1).filter(line => line.trim());
+                const parsedEntries = parseCSVContent(content);
+                if (parsedEntries.length === 0) {
+                    toast.error('No valid lead entries found in CSV');
+                    return;
+                }
 
                 let importedCount = 0;
-                for (const line of records) {
-                    const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                    const leadData: any = {};
-
-                    headers.forEach((header, index) => {
-                        if (values[index] !== undefined) {
-                            if (header === 'budget') {
-                                leadData[header] = parseFloat(values[index]) || 0;
-                            } else {
-                                leadData[header] = values[index];
-                            }
-                        }
-                    });
-
-                    // Ensure at least one contact identifier is present
-                    if (!leadData.name && !leadData.email && !leadData.phone) continue;
-
-                    const leadName = leadData.name || leadData.phone || leadData.email || 'Unnamed Lead';
+                for (const item of parsedEntries) {
+                    const leadName = item.name || item.phone || item.email || 'Unnamed Lead';
 
                     await addLead({
                         id: uuidv4(),
                         created_at: new Date().toISOString(),
                         name: leadName,
-                        email: leadData.email || '',
-                        phone: leadData.phone || '',
-                        status: (leadData.status as any) || 'new',
-                        source: leadData.source || 'CSV Import',
-                        budget: leadData.budget || 0,
-                        tour_interest: leadData.tour_interest || '',
-                        notes: leadData.notes || ''
+                        email: item.email || '',
+                        phone: item.phone || '',
+                        status: (item.status as any) || 'new',
+                        source: item.source || 'CSV Import',
+                        budget: item.budget || 0,
+                        tour_interest: item.tour_interest || '',
+                        notes: item.notes || ''
                     });
                     importedCount++;
                 }
@@ -134,7 +113,7 @@ export function Leads() {
                 toast.success(`Successfully imported ${importedCount} leads`);
             } catch (error) {
                 console.error('Import error:', error);
-                toast.error('Failed to parse CSV file. Please ensure it has the correct headers.');
+                toast.error('Failed to parse CSV file. Please ensure it has valid data.');
             }
         };
         reader.readAsText(file);

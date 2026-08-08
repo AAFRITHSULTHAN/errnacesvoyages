@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { LeadForm } from '@/components/leads/LeadForm';
 import { v4 as uuidv4 } from 'uuid';
+import { parseCSVContent } from '@/lib/csvParser';
 import type { Lead } from '@/types';
 import { KPICards } from '@/components/dashboard/KPICards';
 import { useI18n } from '@/i18n';
@@ -170,7 +171,6 @@ export function Pipeline() {
         fileInputRef.current?.click();
     };
 
-
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -179,42 +179,27 @@ export function Pipeline() {
         reader.onload = async (e) => {
             const content = e.target?.result as string;
             try {
-                const lines = content.split('\n');
-                if (lines.length < 2) throw new Error('File is empty or invalid');
-
-                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
-                const records = lines.slice(1).filter(line => line.trim());
+                const parsedEntries = parseCSVContent(content);
+                if (parsedEntries.length === 0) {
+                    toast.error('No valid lead entries found in CSV');
+                    return;
+                }
 
                 let importedCount = 0;
-                for (const line of records) {
-                    const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                    const leadData: any = {};
-
-                    headers.forEach((header, index) => {
-                        if (values[index] !== undefined) {
-                            if (header === 'budget') {
-                                leadData[header] = parseFloat(values[index]) || 0;
-                            } else {
-                                leadData[header] = values[index];
-                            }
-                        }
-                    });
-
-                    if (!leadData.name && !leadData.email && !leadData.phone) continue;
-
-                    const leadName = leadData.name || leadData.phone || leadData.email || 'Unnamed Lead';
+                for (const item of parsedEntries) {
+                    const leadName = item.name || item.phone || item.email || 'Unnamed Lead';
 
                     await addLead({
                         id: uuidv4(),
                         created_at: new Date().toISOString(),
                         name: leadName,
-                        email: leadData.email || '',
-                        phone: leadData.phone || '',
-                        status: (leadData.status as any) || 'new',
-                        source: leadData.source || 'CSV Import',
-                        budget: leadData.budget || 0,
-                        tour_interest: leadData.tour_interest || '',
-                        notes: leadData.notes || ''
+                        email: item.email || '',
+                        phone: item.phone || '',
+                        status: (item.status as any) || 'new',
+                        source: item.source || 'CSV Import',
+                        budget: item.budget || 0,
+                        tour_interest: item.tour_interest || '',
+                        notes: item.notes || ''
                     });
                     importedCount++;
                 }
@@ -222,7 +207,7 @@ export function Pipeline() {
                 toast.success(`Successfully imported ${importedCount} leads`);
             } catch (error) {
                 console.error('Import error:', error);
-                toast.error('Failed to parse CSV file. Please ensure it has the correct headers.');
+                toast.error('Failed to parse CSV file. Please ensure it has valid data.');
             }
         };
         reader.readAsText(file);

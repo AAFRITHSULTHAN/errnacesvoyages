@@ -321,7 +321,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Assign Staff</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value || 'unassigned'}>
+                                <Select onValueChange={field.onChange} value={(field.value as string) || 'unassigned'}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select staff (optional)" />

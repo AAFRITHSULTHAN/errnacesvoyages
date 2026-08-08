@@ -19,6 +19,7 @@ import { useI18n } from '@/i18n';
 import { WhatsAppModal } from '@/components/leads/WhatsAppModal';
 
 import { getLeadRevenue } from '@/lib/utils';
+import { parseCSVContent } from '@/lib/csvParser';
 
 export function Contacts() {
     const { fetchLeads, addLead, updateLead, deleteLead, tours, leads: rawLeads } = useAppStore();
@@ -31,15 +32,13 @@ export function Contacts() {
             }
         } catch (_) {}
 
-        if (isContactOnly) return true;
-
         return (
-            l.status === 'converted' &&
-            l.source !== 'Staff' && 
-            l.source !== 'WhatsApp' && 
-            l.source !== 'WhatsApp Sync' && 
-            l.source !== 'WhatsApp Web' && 
-            l.source !== 'WhatsApp Group'
+            isContactOnly || 
+            l.source === 'Staff' || 
+            l.source === 'WhatsApp' || 
+            l.source === 'WhatsApp Sync' || 
+            l.source === 'WhatsApp Web' || 
+            l.source === 'WhatsApp Group'
         );
     }), [rawLeads]);
     
@@ -52,7 +51,7 @@ export function Contacts() {
         fetchLeads();
     }, [fetchLeads]);
 
-    // Calculate KPIs
+    // KPI calculation
     const kpis = useMemo(() => {
         const totalContacts = leads.length;
         const totalValue = leads.reduce((sum, l) => sum + getLeadRevenue(l, tours), 0);
@@ -105,44 +104,28 @@ export function Contacts() {
         reader.onload = async (e) => {
             const content = e.target?.result as string;
             try {
-                const lines = content.split('\n');
-                if (lines.length < 2) throw new Error('File is empty or invalid');
-
-                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
-                const records = lines.slice(1).filter(line => line.trim());
+                const parsedEntries = parseCSVContent(content);
+                if (parsedEntries.length === 0) {
+                    toast.error('No valid contact entries found in CSV');
+                    return;
+                }
 
                 let importedCount = 0;
-                for (const line of records) {
-                    const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                    const leadData: any = {};
-
-                    headers.forEach((header, index) => {
-                        if (values[index] !== undefined) {
-                            if (header === 'budget') {
-                                leadData[header] = parseFloat(values[index]) || 0;
-                            } else {
-                                leadData[header] = values[index];
-                            }
-                        }
-                    });
-
-                    // Ensure at least one contact identifier is present
-                    if (!leadData.name && !leadData.email && !leadData.phone) continue;
-
-                    const contactName = leadData.name || leadData.phone || leadData.email || 'Unnamed Contact';
+                for (const item of parsedEntries) {
+                    const contactName = item.name || item.phone || item.email || 'Unnamed Contact';
 
                     await addLead({
                         id: uuidv4(),
                         created_at: new Date().toISOString(),
                         name: contactName,
-                        email: leadData.email || '',
-                        phone: leadData.phone || '',
-                        status: 'converted', // Default imported contacts from this page to converted
-                        source: leadData.source || 'CSV Import',
-                        budget: leadData.budget || 0,
-                        tour_interest: leadData.tour_interest || '',
+                        email: item.email || '',
+                        phone: item.phone || '',
+                        status: (item.status as any) || 'converted',
+                        source: item.source || 'CSV Import',
+                        budget: item.budget || 0,
+                        tour_interest: item.tour_interest || '',
                         notes: JSON.stringify({
-                            notes: leadData.notes || '',
+                            notes: item.notes || '',
                             passport_details: '',
                             dob: '',
                             tour_departure: '',
@@ -156,7 +139,7 @@ export function Contacts() {
                 toast.success(`Successfully imported ${importedCount} contacts`);
             } catch (error) {
                 console.error('Import error:', error);
-                toast.error('Failed to parse CSV file. Please ensure it has the correct headers.');
+                toast.error('Failed to parse CSV file. Please ensure it has valid data.');
             }
         };
         reader.readAsText(file);
