@@ -261,7 +261,7 @@ export function LeadDetails() {
     };
 
     const handleStaffChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const newStaffId = e.target.value || undefined;
+        const newStaffId = e.target.value ? e.target.value : null;
         try {
             await updateLead(lead.id, { assigned_staff_id: newStaffId });
             toast.success('Assigned staff updated successfully');

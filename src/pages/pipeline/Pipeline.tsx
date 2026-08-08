@@ -200,13 +200,15 @@ export function Pipeline() {
                         }
                     });
 
-                    if (!leadData.name || !leadData.email) continue;
+                    if (!leadData.name && !leadData.email && !leadData.phone) continue;
+
+                    const leadName = leadData.name || leadData.phone || leadData.email || 'Unnamed Lead';
 
                     await addLead({
                         id: uuidv4(),
                         created_at: new Date().toISOString(),
-                        name: leadData.name,
-                        email: leadData.email,
+                        name: leadName,
+                        email: leadData.email || '',
                         phone: leadData.phone || '',
                         status: (leadData.status as any) || 'new',
                         source: leadData.source || 'CSV Import',

@@ -25,11 +25,13 @@ import type { Lead } from '@/types';
 import { useAppStore } from '@/store';
 
 const leadSchema = z.object({
-    name: z.string().min(2, 'Name must be at least 2 characters'),
-    email: z.string().email('Invalid email address'),
-    phone: z.string().min(10, 'Phone number must be at least 10 characters'),
+    name: z.string().optional(),
+    email: z.string().optional().refine(val => !val || val.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+        message: 'Invalid email address',
+    }),
+    phone: z.string().optional(),
     status: z.enum(['new', 'contacted', 'qualified', 'proposal_sent', 'converted', 'lost']),
-    source: z.string().min(2, 'Source is required'),
+    source: z.string().min(1, 'Source is required'),
     tour_interest: z.string().optional(),
     budget: z.number().optional(),
     assigned_staff_id: z.string().optional(),
@@ -38,6 +40,18 @@ const leadSchema = z.object({
     dob: z.string().optional(),
     tour_departure: z.string().optional(),
     tour_arrival: z.string().optional(),
+}).superRefine((data, ctx) => {
+    const hasName = Boolean(data.name && data.name.trim().length > 0);
+    const hasEmail = Boolean(data.email && data.email.trim().length > 0);
+    const hasPhone = Boolean(data.phone && data.phone.trim().length > 0);
+
+    if (!hasName && !hasEmail && !hasPhone) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Please enter at least a Name, Email, or Phone number',
+            path: ['name'],
+        });
+    }
 });
 
 type LeadFormValues = z.infer<typeof leadSchema>;
@@ -133,8 +147,25 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             }
         } catch (_) {}
 
+        let finalName = (values.name || '').trim();
+        const finalPhone = (values.phone || '').trim();
+        const finalEmail = (values.email || '').trim();
+
+        if (!finalName) {
+            if (finalPhone) {
+                finalName = finalPhone;
+            } else if (finalEmail) {
+                finalName = finalEmail.split('@')[0];
+            } else {
+                finalName = 'Unnamed Contact';
+            }
+        }
+
         const payload = {
             ...values,
+            name: finalName,
+            email: finalEmail,
+            phone: finalPhone,
             notes: JSON.stringify({
                 ...existingNotesObj,
                 notes: values.notes || '',
@@ -145,7 +176,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             })
         };
         if (!payload.assigned_staff_id || payload.assigned_staff_id === 'unassigned' || payload.assigned_staff_id === '') {
-            payload.assigned_staff_id = undefined;
+            (payload as any).assigned_staff_id = null;
         }
         
         // Remove individual virtual fields so they don't go to Supabase as columns
@@ -154,7 +185,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
         delete (payload as any).tour_departure;
         delete (payload as any).tour_arrival;
 
-        onSubmit(payload);
+        onSubmit(payload as any);
     };
 
     return (
@@ -168,7 +199,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
                             <FormItem>
                                 <FormLabel>Full Name</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="John Doe" {...field} />
+                                    <Input placeholder="e.g. John Doe (Optional if Email/Phone given)" {...field} value={field.value || ''} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -181,7 +212,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
                             <FormItem>
                                 <FormLabel>Email</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="john@example.com" type="email" {...field} />
+                                    <Input placeholder="john@example.com (Optional)" type="email" {...field} value={field.value || ''} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -197,7 +228,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
                             <FormItem>
                                 <FormLabel>Phone</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="+1 234 567 890" {...field} />
+                                    <Input placeholder="+1 234 567 890 (Optional)" {...field} value={field.value || ''} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -290,7 +321,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Assign Staff</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value as string}>
+                                <Select onValueChange={field.onChange} value={field.value || 'unassigned'}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select staff (optional)" />

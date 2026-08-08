@@ -290,16 +290,49 @@ export async function updateStaff(id: string, updates: any) {
         .single();
 
     if (error) throw error;
+
+    // Sync to profiles table
+    try {
+        const profileUpdates: any = {};
+        if (updates.full_name) profileUpdates.full_name = updates.full_name;
+        if (updates.email) profileUpdates.email = updates.email;
+        if (updates.role) profileUpdates.role = updates.role;
+        if (Object.keys(profileUpdates).length > 0) {
+            await supabase.from('profiles').update(profileUpdates).eq('id', id);
+        }
+    } catch (_) {
+    }
+
     return data;
 }
 
 export async function deleteStaff(id: string) {
-    const { error } = await supabase
+    // 1. Unassign any leads currently assigned to this staff member to prevent FK constraint error
+    try {
+        await supabase
+            .from('leads')
+            .update({ assigned_staff_id: null })
+            .eq('assigned_staff_id', id);
+    } catch (leadErr) {
+        console.error('Failed to unassign leads for staff member before deletion:', leadErr);
+    }
+
+    // 2. Delete staff member from 'staffs' table
+    const { error: staffError } = await supabase
         .from('staffs')
         .delete()
         .eq('id', id);
 
-    if (error) throw error;
+    if (staffError) throw staffError;
+
+    // 3. Delete staff member from 'profiles' table (best-effort cleanup)
+    try {
+        await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', id);
+    } catch (_) {
+    }
 }
 
 // --- WHATSAPP ---

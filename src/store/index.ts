@@ -61,6 +61,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     addLead: async (lead) => {
         set({ isLoading: true });
         try {
+            if ('assigned_staff_id' in lead) {
+                if (!lead.assigned_staff_id || lead.assigned_staff_id === 'unassigned' || lead.assigned_staff_id === '') {
+                    lead.assigned_staff_id = null;
+                }
+            }
+
             // If assigning a staff member, first ensure they have a profile entry
             if (lead.assigned_staff_id) {
                 const staffMember = get().staff.find(s => s.id === lead.assigned_staff_id);
@@ -138,6 +144,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
     updateLead: async (id, updates) => {
         try {
+            if ('assigned_staff_id' in updates) {
+                if (!updates.assigned_staff_id || updates.assigned_staff_id === 'unassigned' || updates.assigned_staff_id === '') {
+                    updates.assigned_staff_id = null;
+                }
+            }
+
             // If assigning a staff member, first ensure they have a profile entry
             // (required by the leads.assigned_staff_id FK constraint on profiles table)
             if (updates.assigned_staff_id) {
@@ -302,14 +314,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     deleteStaff: async (id) => {
         try {
             set((state) => ({
-                staff: state.staff.filter((s) => s.id !== id)
+                staff: state.staff.filter((s) => s.id !== id),
+                leads: state.leads.map((l) => (l.assigned_staff_id === id ? { ...l, assigned_staff_id: null } : l))
             }));
             await api.deleteStaff(id);
             toast.success('Staff deleted successfully');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to delete staff:', error);
-            toast.error('Failed to delete staff');
+            const errMsg = error?.message || error?.details || (error instanceof Error ? error.message : 'Unknown error');
+            toast.error(`Failed to delete staff: ${errMsg}`);
             get().fetchStaff();
+            get().fetchLeads();
         }
     },
     sendWhatsApp: async (leadId, to, message, contentSid, contentVariables) => {

@@ -126,14 +126,16 @@ export function Contacts() {
                         }
                     });
 
-                    // Ensure required fields or set defaults
-                    if (!leadData.name || !leadData.email) continue;
+                    // Ensure at least one contact identifier is present
+                    if (!leadData.name && !leadData.email && !leadData.phone) continue;
+
+                    const contactName = leadData.name || leadData.phone || leadData.email || 'Unnamed Contact';
 
                     await addLead({
                         id: uuidv4(),
                         created_at: new Date().toISOString(),
-                        name: leadData.name,
-                        email: leadData.email,
+                        name: contactName,
+                        email: leadData.email || '',
                         phone: leadData.phone || '',
                         status: 'converted', // Default imported contacts from this page to converted
                         source: leadData.source || 'CSV Import',

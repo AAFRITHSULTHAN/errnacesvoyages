@@ -100,15 +100,20 @@ export function LeadsTable({ leads, onEdit, onDelete, onWhatsApp }: LeadsTablePr
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-col gap-1.5">
-                                        <div className="flex items-center gap-2 text-[12px] font-bold text-slate-600 group-hover:text-indigo-700 transition-colors">
-                                            <Mail className="h-3 w-3 opacity-50" />
-                                            {lead.email}
-                                        </div>
+                                        {lead.email && (
+                                            <div className="flex items-center gap-2 text-[12px] font-bold text-slate-600 group-hover:text-indigo-700 transition-colors">
+                                                <Mail className="h-3 w-3 opacity-50" />
+                                                {lead.email}
+                                            </div>
+                                        )}
                                         {lead.phone && (
                                             <div className="flex items-center gap-2 text-[12px] font-bold text-slate-500">
                                                 <Phone className="h-3 w-3 opacity-50" />
                                                 {lead.phone}
                                             </div>
+                                        )}
+                                        {!lead.email && !lead.phone && (
+                                            <span className="text-[11px] font-bold text-slate-400 italic">No details</span>
                                         )}
                                     </div>
                                 </TableCell>

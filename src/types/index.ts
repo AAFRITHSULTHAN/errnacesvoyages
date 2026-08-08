@@ -22,7 +22,7 @@ export type Lead = {
     selection_timestamp?: string;
     budget?: number;
     travel_date?: string;
-    assigned_staff_id?: string;
+    assigned_staff_id?: string | null;
     created_at: string;
     notes?: string;
 };
