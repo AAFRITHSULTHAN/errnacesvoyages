@@ -32,14 +32,7 @@ export function Contacts() {
             }
         } catch (_) {}
 
-        return (
-            isContactOnly || 
-            l.source === 'Staff' || 
-            l.source === 'WhatsApp' || 
-            l.source === 'WhatsApp Sync' || 
-            l.source === 'WhatsApp Web' || 
-            l.source === 'WhatsApp Group'
-        );
+        return isContactOnly;
     }), [rawLeads]);
     
     const [isDialogOpen, setIsDialogOpen] = useState(false);
